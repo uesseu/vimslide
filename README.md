@@ -1,4 +1,4 @@
-# nin-slide.vim
+# vimslide
 標準入出力と相性の良いvimベースのパワポもどきです。  
 現時点ではLinuxでKittyを使う事を想定しています。
 
