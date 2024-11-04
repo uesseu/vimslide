@@ -44,10 +44,11 @@
 \*はvimの上では正規表現になってしまうので、'\\\*\\\*\\\*'という風にします。
 
 ```vim
-call SlideSetSeparator('<down>', '<up>', '---', '.')
-call SlideSetSeparator('<right>', '<left>', '\*\*\*', '.')
+call SlideStart('<down>', '<up>', '---', '.')
+call SlideStart('<right>', '<left>', '\*\*\*', '.')
 ```
 
+2回SlideStartしてもかまいません。
 これで、こんな感じにしていきます。
 
 ```
@@ -59,7 +60,7 @@ call SlideSetSeparator('<right>', '<left>', '\*\*\*', '.')
 - 項目2
 - 項目3
 
---- ***
+--- *** 
 題名2
 
 本文1
@@ -71,7 +72,9 @@ call SlideSetSeparator('<right>', '<left>', '\*\*\*', '.')
 
 --- ***
 
-```
+'\*\*\*'で横飛び、'---'で縦飛びです。
+
+---
 
 ## コマンド
 このプログラムではvim scriptを書く事ができます。
@@ -120,3 +123,48 @@ kitty \
 	vim '+call StartSlide()' slide.txt
 ```
 
+ここでポイントは下記です。
+```
+    -o allow_remote_control=yes\
+    -o enabled_layouts=tall\
+```
+これによってkittyがコマンドラインによるリモートコントロールを受けつけるようになります。なので、例えば
+
+```
+kitten @ set-background-image [/path/to/image.png]
+```
+
+みたいにすると良いのです。これをスライド中でどうつかうかというと
+
+```
+---
+.call system('kitten @ set-background-image [/path/to/image1.png]')
+.sleep 1
+.call system('kitten @ set-background-image [/path/to/image2.png]')
+.sleep 2
+こんにちは
+
+
+---
+```
+
+このようにすると、「こんにちは」と表示した後で1秒ごとに背景画像を更新します。
+応用すると、VOICEVOXを起動した状態でninvoiceを使って…
+
+```
+---
+.!echo こんにちは、ずんだもんなのだ。| ninvoice -c&
+.call system('kitten @ set-background-image [/path/to/zundamon1.png]')
+.sleep 1
+.call system('kitten @ set-background-image [/path/to/zundamon2.png]')
+.sleep 2
+こんにちは、ずんだもんなのだ
+
+
+---
+```
+
+こうすると、ずんだもんが動きながら喋るようになります。
+
+# TODO
+- [] neovim対応

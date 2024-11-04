@@ -33,7 +33,8 @@ function! GoToSlide(sep, up, command_flag='.')
     endif
   endwhile
   call cursor(s:showline, 0)
-  call RunCommand(s:curline+1, a:command_flag)
+  return s:curline
+  "call RunCommand(s:curline+1, a:command_flag)
 endfunction
 
 function RunCommand(line, command_flag)
@@ -59,6 +60,7 @@ function RunCommand(line, command_flag)
     endif
     let s:curline = s:curline + 1
   endwhile
+  redraw!
 endfunction
 
 
@@ -69,8 +71,16 @@ function SlideStart(forward, backward, sep, command_flag='.')
   set laststatus=0
   set nolist
   set noshowcmd
-  exec "nnoremap ".a:forward." :call GoToSlide('".a:sep."', 0, '".a:command_flag."')<CR>z<CR>0:redraw!<CR>"
-  exec "nnoremap ".a:backward." :call GoToSlide('".a:sep."', 1, '".a:command_flag."')<CR>z<CR>0:redraw!<CR>"
+  if has('nvim')
+    highlight Normal guibg=none
+    highlight NonText guibg=none
+    highlight Normal ctermbg=none
+    highlight NonText ctermbg=none
+    highlight NormalNC guibg=none
+    highlight NormalSB guibg=none
+  endif
+  exec "nnoremap ".a:forward." :let Line=GoToSlide('".a:sep."', 0, '".a:command_flag."')+1<CR>z<CR>0:redraw!<CR>:call RunCommand(Line, '.')<CR>"
+  exec "nnoremap ".a:backward." :let Line=GoToSlide('".a:sep."', 1, '".a:command_flag."')+1<CR>z<CR>0:redraw!<CR>:call RunCommand(Line, '.')<CR>"
 endfunction
 
 let &cpo = s:save_cpo
