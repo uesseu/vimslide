@@ -8,7 +8,8 @@
 
 <details>
 <summary> メリットとデメリット </summary>
-# メリットあるの？
+
+## メリットあるの？
 - プレゼン中にシェルスクリプトを差しこめる
   + CUI関連のプレゼンと相性が圧倒的に良い
   + ブラウザを起動できるのでwebとも相性良い
@@ -16,7 +17,7 @@
 - 一部界隈で宴会芸できる
 - 意外と使いやすい
 
-# 酷いデメリットあるでしょ？
+## 酷いデメリットあるでしょ？
 あるぞ！
 
 - フォントを弄れない
@@ -26,7 +27,8 @@
 
 </details>
 
-# 無いと辛いもの
+# 必要な環境
+## 無いと辛いもの
 - 標準出力経由で背景を変えられるterminal emulator
 - 起動後にフォントのサイズを変えられるterminal emulator
  
@@ -34,7 +36,7 @@
 https://sw.kovidgoyal.net/kitty/
 
 
-# 有ると素晴しいもの
+## 有ると素晴しいもの
 VOICEVOX本体。音声合成ソフト。  
 https://voicevox.hiroshiba.jp/
 
@@ -42,7 +44,9 @@ shellで動くVOICEVOXクライアント
 ずんだもんが代りに喋ってくれる。
 https://github.com/uesseu/ninvoicevox
 
-# 僕の環境
+## 僕の環境
+下記は例です。
+
 - arch linux
 - kitty
 - VOICEVOX engine
@@ -116,11 +120,11 @@ vim scriptでは頭文字が'!'でshellscriptを書けますし、'py3'等を行
 ---
 ```
 
-事前にこんな感じのをstyle.vimというファイルに書いておきます。
+事前に下記のような感じのをstyle.vimというファイルに書いておきます。
 これはスライドのデザインや利便性を高めるためのファイルとして使います。ま、スライド自体に全部書いてもいいのですけれどね。
 
 
-```
+```vim
 function StartSlide()
   call SlideStart('<down>', '<up>', '---', '.')
   call SlideStart('<right>', '<left>', '\*\*\*', '.')
@@ -146,7 +150,7 @@ call StartSlide()
 下記のようなシェルスクリプトを作って、それを起動します。そんで、起動後に画面の大きさを調整します。
 
 
-```sh start.sh
+```sh
 font_size=40
 background_opacity=1.0
 kitty \
