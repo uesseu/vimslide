@@ -11,9 +11,16 @@ if exists('g:loaded_vimslide')
   finish
 endif
 let g:loaded_vimslide = 1
+let g:slide_script_enable = 1
+let g:slide#is_stopped = 0
+let g:slide#current_line = 1
 
-
-function! GoToSlide(sep, up, command_flag='.')
+function! slide#goto(sep='---', up=0, command_flag='.')
+  " Return -1 if stop mode. Else, return line to run.
+  if g:slide#is_stopped
+    redraw!
+    return -1
+  endif
   if a:up
     let s:curline=search(a:sep, 'b')
     let s:curline=search(a:sep, 'b')
@@ -33,14 +40,34 @@ function! GoToSlide(sep, up, command_flag='.')
     endif
   endwhile
   call cursor(s:showline, 0)
-  return s:curline
-  "call RunCommand(s:curline+1, a:command_flag)
+  exec "norm z\n"
+  exec "redraw!"
+  return s:curline + 1
+  "call slide#run(s:curline+1, a:command_flag)
 endfunction
 
-function RunCommand(line, command_flag)
+
+function slide#run(line=0, command_flag='.')
+  if a:line == 0
+    let s:line = search(a:sep, 'b')+1
+  elseif a:line == -1
+    let g:slide#is_stopped = 0
+    let s:line = g:slide#current_line
+  else
+    let s:line = a:line
+  endif
+  if g:slide_script_enable == 0
+    redraw!
+    return
+  endif
   let s:command = ''
-  let s:curline = a:line
+  let s:curline = s:line
   while 1
+    " Stop if stop mode
+    if g:slide#is_stopped == 1
+      let g:slide#current_line = s:curline
+      return
+    endif
     let s:str = getline(s:curline)
     " Run shell if head is '!'
     if s:str[0] == a:command_flag
@@ -64,7 +91,7 @@ function RunCommand(line, command_flag)
 endfunction
 
 
-function SlideStart(forward, backward, sep, command_flag='.')
+function slide#start(forward='<down>', backward='<up>', sep='---', command_flag='.')
   set nocompatible
   set noruler
   set nonumber
@@ -79,9 +106,20 @@ function SlideStart(forward, backward, sep, command_flag='.')
     highlight NormalNC guibg=none
     highlight NormalSB guibg=none
   endif
-  exec "nnoremap ".a:forward." :let Line=GoToSlide('".a:sep."', 0, '".a:command_flag."')+1<CR>z<CR>0:redraw!<CR>:call RunCommand(Line, '.')<CR>"
-  exec "nnoremap ".a:backward." :let Line=GoToSlide('".a:sep."', 1, '".a:command_flag."')+1<CR>z<CR>0:redraw!<CR>:call RunCommand(Line, '.')<CR>"
+  exec "nnoremap ".a:forward." :silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.')<CR>"
+  exec "nnoremap ".a:backward." :silent! call slide#run(slide#goto('".a:sep."', 1, '".a:command_flag."'), '.')<CR>"
 endfunction
+
+function slide#stop()
+  let g:slide#is_stopped = 1
+  redraw!
+endfunction
+
+function slide#put_text(line, text)
+  call setline(line('.') + a:line, a:text)
+  redraw!
+endfunction
+
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

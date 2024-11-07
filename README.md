@@ -102,6 +102,42 @@ call SlideStart('<right>', '<left>', '\*\*\*', '.')
 vim scriptでは頭文字が'!'でshellscriptを書けますし、'py3'等を行頭に置くとpythonが書けます。つまり…やりたい放題ですね。
 
 
+## ストップモード
+スライドのスクリプトをストップモードにする事ができます。
+これによって、フラグメントや画像の差し替えを実現できます。
+
+```
+---
+.call slide#stop()
+```
+
+## 強調
+vimはhilightコマンドとmatchコマンドによってハイライトをします。
+下記のようにどのようにハイライトするのかを決めて、
+```//```の中の文字列にマッチさせます。
+
+```
+---
+.highlight Warn1 ctermbg=red ctermfg=white bold
+.match Warn1 /vim/
+```
+
+## フラグメント
+フラグメントを使うためには以下の手順を踏みます。
+
+- slide#put_text関数でスライド中の文字列を消しておく
+- slide#stop関数でスライドをストップモードにする
+- slide#put_text関数でスライド中に文字列を書き加える
+
+```
+---
+.call slide#put_text(3, '')
+.call slide#stop()
+.call slide#put_text(3, '- hoge')
+```
+
+
+
 # 凝った使い方の例
 
 下記のようなスライドを目指します。
