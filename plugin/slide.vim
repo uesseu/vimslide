@@ -108,8 +108,8 @@ function slide#start(forward='<down>', backward='<up>', sep='---', command_flag=
     highlight NormalNC guibg=none
     highlight NormalSB guibg=none
   endif
-  exec "nnoremap ".a:forward." :silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.')<CR>"
-  exec "nnoremap ".a:backward." :silent! call slide#run(slide#goto('".a:sep."', 1, '".a:command_flag."'), '.')<CR>"
+  exec "nnoremap ".a:forward." :silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.')<CR><c-l>"
+  exec "nnoremap ".a:backward." :silent! call slide#run(slide#goto('".a:sep."', 1, '".a:command_flag."'), '.')<CR><c-l>"
 endfunction
 
 function slide#wait()
@@ -120,6 +120,13 @@ endfunction
 function slide#put_text(line, text)
   call setline(line('.') + a:line, a:text)
   redraw!
+endfunction
+
+function slide#hide_cursor()
+  let s:echoraw = has('nvim')
+        \? {str -> chansend(v:stderr, str)}
+        \: {str->echoraw(str)}
+  call s:echoraw("\x1b[6 q")
 endfunction
 
 function slide#image(fname, x=0, y=0, width=0, height=0) 
