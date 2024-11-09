@@ -20,7 +20,6 @@ let g:slide#terminal = 'sixel'
 function! slide#goto(sep='---', up=0, command_flag='.')
   " Return -1 if stop mode. Else, return line to run.
   if g:slide#is_waiting
-    redraw!
     return -1
   endif
   if a:up
@@ -43,13 +42,12 @@ function! slide#goto(sep='---', up=0, command_flag='.')
   endwhile
   call cursor(s:showline, 0)
   exec "norm z\n"
-  exec "redraw!"
   return s:curline + 1
   "call slide#run(s:curline+1, a:command_flag)
 endfunction
 
 
-function slide#run(line=0, command_flag='.')
+function slide#run(line=0, command_flag='.', sep='---')
   if a:line == 0
     let s:line = search(a:sep, 'b')+1
   elseif a:line == -1
@@ -59,7 +57,6 @@ function slide#run(line=0, command_flag='.')
     let s:line = a:line
   endif
   if g:slide_script_enable == 0
-    redraw!
     return
   endif
   let s:command = ''
@@ -89,9 +86,14 @@ function slide#run(line=0, command_flag='.')
     endif
     let s:curline = s:curline + 1
   endwhile
-  redraw!
 endfunction
 
+function slide#go_and_run(forward='<down>', backward='<up>', sep='---', command_flag='.')
+  silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.', '".a:sep."')
+endfunction
+
+let g:slide#keys = []
+let g:slide#command_num = 0
 
 function slide#start(forward='<down>', backward='<up>', sep='---', command_flag='.')
   set nocompatible
@@ -100,6 +102,7 @@ function slide#start(forward='<down>', backward='<up>', sep='---', command_flag=
   set laststatus=0
   set nolist
   set noshowcmd
+  set nocursorline
   if has('nvim')
     highlight Normal guibg=none
     highlight NonText guibg=none
@@ -107,19 +110,40 @@ function slide#start(forward='<down>', backward='<up>', sep='---', command_flag=
     highlight NonText ctermbg=none
     highlight NormalNC guibg=none
     highlight NormalSB guibg=none
+  else
+    highlight Normal ctermbg=none
+    highlight NonText ctermbg=none
+    highlight LineNr ctermbg=none
+    highlight Folded ctermbg=none
+    highlight EndOfBuffer ctermbg=none
   endif
-  exec "nnoremap ".a:forward." :silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.')<CR><c-l>"
-  exec "nnoremap ".a:backward." :silent! call slide#run(slide#goto('".a:sep."', 1, '".a:command_flag."'), '.')<CR><c-l>"
+  call slide#set_key(a:forward, 0, a:sep, a:command_flag)
+  call slide#set_key(a:backward, 1, a:sep, a:command_flag)
+endfunction
+
+function slide#set_key(key, direction=0, sep='---', command_flag='.')
+  let g:slide#keys = g:slide#keys +
+        \[{'direction': a:direction,
+        \  'sep': a:sep,
+        \  'command_flag': a:command_flag
+        \}]
+  exec $"nnoremap {a:key} :call slide#next({g:slide#command_num})<CR>:<ESC>"
+  let g:slide#command_num = g:slide#command_num + 1
+endfunction
+
+function slide#next(num)
+  let s:arg = g:slide#keys[a:num]
+  silent! call slide#run(slide#goto(
+        \s:arg['sep'], s:arg['direction'], s:arg['command_flag']),
+        \s:arg['command_flag'], s:arg['sep'])
 endfunction
 
 function slide#wait()
   let g:slide#is_waiting = 1
-  redraw!
 endfunction
 
 function slide#put_text(line, text)
   call setline(line('.') + a:line, a:text)
-  redraw!
 endfunction
 
 function slide#hide_cursor()
@@ -145,16 +169,12 @@ function slide#image(fname, x=0, y=0, width=0, height=0)
     let s:height = a:height != 0 ? $" --height {a:height}" : ''
     call s:echoraw(system($"imgcat {a:fname}{s:width}{s:height} --position{x},{y}"))
   elseif g:slide#terminal == 'kitty'
-    call system($'kitten icat --place {a:width}x{a:height}@{a:x}x{a:y} {a:fname} >/dev/tty </dev/tty')
+    silent! call system($'kitten icat --place {a:width}x{a:height}@{a:x}x{a:y} {a:fname} >/dev/tty </dev/tty')
   endif
-
 endfunction
 
 function slide#clear_image()
-  if g:slide#terminal == 'kitty'
-    silent! exec '!kitten icat --clear'
-  endif
-  execute "normal! \<c-l>"
+  redraw!
 endfunction
 
 let &cpo = s:save_cpo
