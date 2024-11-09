@@ -14,10 +14,12 @@ let g:loaded_vimslide = 1
 let g:slide_script_enable = 1
 let g:slide#is_stopped = 0
 let g:slide#current_line = 1
+" iterm, sixel, kitty, wezterm_icat
+let g:slide#terminal = 'sixel'
 
 function! slide#goto(sep='---', up=0, command_flag='.')
   " Return -1 if stop mode. Else, return line to run.
-  if g:slide#is_stopped
+  if g:slide#is_waiting
     redraw!
     return -1
   endif
@@ -51,7 +53,7 @@ function slide#run(line=0, command_flag='.')
   if a:line == 0
     let s:line = search(a:sep, 'b')+1
   elseif a:line == -1
-    let g:slide#is_stopped = 0
+    let g:slide#is_waiting = 0
     let s:line = g:slide#current_line
   else
     let s:line = a:line
@@ -63,8 +65,8 @@ function slide#run(line=0, command_flag='.')
   let s:command = ''
   let s:curline = s:line
   while 1
-    " Stop if stop mode
-    if g:slide#is_stopped == 1
+    " Stop if wait mode
+    if g:slide#is_waiting == 1
       let g:slide#current_line = s:curline
       return
     endif
@@ -110,8 +112,8 @@ function slide#start(forward='<down>', backward='<up>', sep='---', command_flag=
   exec "nnoremap ".a:backward." :silent! call slide#run(slide#goto('".a:sep."', 1, '".a:command_flag."'), '.')<CR>"
 endfunction
 
-function slide#stop()
-  let g:slide#is_stopped = 1
+function slide#wait()
+  let g:slide#is_waiting = 1
   redraw!
 endfunction
 
@@ -120,6 +122,33 @@ function slide#put_text(line, text)
   redraw!
 endfunction
 
+function slide#image(fname, x=0, y=0, width=0, height=0) 
+  if g:slide#terminal == 'sixel'
+    let s:echoraw = has('nvim')
+          \? {str -> chansend(v:stderr, str)}
+          \: {str->echoraw(str)}
+    call s:echoraw("\x1b[s")
+    call s:echoraw($"\x1b[{a:y};{a:x}H")
+    let s:width = a:width != 0 ? $" -w {a:width}" : ''
+    let s:height = a:height != 0 ? $" -w {a:height}" : ''
+    call s:echoraw(system($"img2sixel {a:fname}{s:width}{s:height}"))
+    call s:echoraw("\x1b[u")
+  elseif g:slide#terminal == 'iterm'
+    let s:width = a:width != 0 ? $" --width {a:width}" : ''
+    let s:height = a:height != 0 ? $" --height {a:height}" : ''
+    call s:echoraw(system($"imgcat {a:fname}{s:width}{s:height} --position{x},{y}"))
+  elseif g:slide#terminal == 'kitty'
+    call system($'kitten icat --place {a:width}x{a:height}@{a:x}x{a:y} {a:fname} >/dev/tty </dev/tty')
+  endif
+
+endfunction
+
+function slide#clear_image()
+  if g:slide#terminal == 'kitty'
+    silent! exec '!kitten icat --clear'
+  endif
+  execute "normal! \<c-l>"
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

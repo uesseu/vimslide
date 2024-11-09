@@ -1,5 +1,6 @@
 # vimslide
 このリポジトリは現時点では絶賛開発初期状態で安定してません。破壊的更新を繰り返しています。
+というか現時点ではジョークソフトなので…。
 
 
 標準入出力と相性の良いvimベースのパワポもどきです。  
@@ -35,11 +36,17 @@
 - 標準出力経由で背景を変えられるterminal emulator
 - 起動後にフォントのサイズを変えられるterminal emulator
  
-具体的にはkitty等。
+具体的にはkitty等。  
+動的に背景画像を変えられてファンシー。独自プロトコルだけど、vimでも画像を表示できるぞ。
+
 https://sw.kovidgoyal.net/kitty/
 
+sixel対応のweztermも有力。  
 
-## 有ると素晴しいもの
+https://wezfurlong.org/wezterm/
+
+
+## 有ると宴会芸になるもの
 VOICEVOX本体。音声合成ソフト。  
 https://voicevox.hiroshiba.jp/
 
@@ -102,13 +109,13 @@ call SlideStart('<right>', '<left>', '\*\*\*', '.')
 vim scriptでは頭文字が'!'でshellscriptを書けますし、'py3'等を行頭に置くとpythonが書けます。つまり…やりたい放題ですね。
 
 
-## ストップモード
-スライドのスクリプトをストップモードにする事ができます。
+## ウェイトモード
+スライドのスクリプトをウェイトモードにする事ができます。
 これによって、フラグメントや画像の差し替えを実現できます。
 
 ```
 ---
-.call slide#stop()
+.call slide#wait()
 ```
 
 ## 強調
@@ -126,67 +133,38 @@ vimはhilightコマンドとmatchコマンドによってハイライトをし�
 フラグメントを使うためには以下の手順を踏みます。
 
 - slide#put_text関数でスライド中の文字列を消しておく
-- slide#stop関数でスライドをストップモードにする
+- slide#wait関数でスライドをウェイトモードにする
 - slide#put_text関数でスライド中に文字列を書き加える
 
 ```
 ---
 .call slide#put_text(3, '')
-.call slide#stop()
+.call slide#wait()
 .call slide#put_text(3, '- hoge')
 ```
 
-
-
-# 凝った使い方の例
-
-下記のようなスライドを目指します。
-これは、ずんだもんが「こんにちは、ずんだもんなのだ」と言いながら、1秒後に表情を変えるものです。
-下記のようなテキストファイルをslide.txtとして保存しましょう。
-一番上の空白は忘れずに入れて下さい。
+## 画像
+sixel対応ターミナルやkittyで画像を表示できます。細かい挙動は違うかも。
+まず、ターミナルの設定をします。ここで、候補はkittyかsixelです。デフォルトはsixel。
 
 ```
-
-
----
-.Zundamon こんにちは、ずんだもんなのだ。
-.Image /path/to/image1.png
-.sleep 1
-.Image /path/to/image2.png
-こんにちは、ずんだもんなのだ
-
-
----
+let g:slide#terminal = 'kitty'
 ```
 
-事前に下記のような感じのをstyle.vimというファイルに書いておきます。
-これはスライドのデザインや利便性を高めるためのファイルとして使います。ま、スライド自体に全部書いてもいいのですけれどね。
+あとは、下記です。
 
-
-```vim
-function StartSlide()
-  call SlideStart('<down>', '<up>', '---', '.')
-  call SlideStart('<right>', '<left>', '\*\*\*', '.')
-  highlight Normal ctermbg=none
-  highlight NonText ctermbg=none
-  highlight LineNr ctermbg=none
-  highlight Folded ctermbg=none
-  highlight EndOfBuffer ctermbg=none
-endfunction
-
-command! -nargs=1 Sh silent! call system(<args>)
-command! -nargs=1 Zundamon silent! call system("echo <args> | ninvoice -c &")
-command! -nargs=1 Image silent! call system("kitten @ set-background-image <args>")
-call StartSlide()
+```
+call slide#image([ファイル名], [x軸], [y軸], [幅], [高さ])
 ```
 
-- StartSlideは2種類のセパレータを設定しつつ、画面を透過させます。
-- Shはシェルスクリプトを単純に実行します。
-- Zundamonはninvoiceを通してずんだもんがバックグラウンドで喋ってくれます。
-- Imageはターミナルエミュレータkittyの背景画像を変えます。
+スライドを遷移する場合は画像を消す必要があるので、消しましょう。
 
+```
+call slide#clear_image([ファイル名], [x軸], [y軸], [幅], [高さ])
+```
 
-下記のようなシェルスクリプトを作って、それを起動します。そんで、起動後に画面の大きさを調整します。
+## kittyで背景画像を動的に変える
+kittyの場合は下記のようなシェルスクリプトを作って、それを起動すれば動的に背景画像を変えられます。そんで、起動後に画面の大きさを調整します。
 
 
 ```sh
@@ -201,7 +179,7 @@ kitty \
 	-o background_image_layout=cscaled\
         -o cursor_blink_interval=0\
 	-o cursor_shape=beam\
-	vim '+source style.vim' slide.txt
+	vim slide.txt
 ```
 
 ここでポイントは下記です。
@@ -215,43 +193,25 @@ kitty \
 .call silent! system("kitten @ set-background-image /path/to/image.png")
 ```
 
-みたいにするとpath/to/image.pngが背景画像になります。ただし、先程vimのコマンドを作りましたから下記でいいです。
+みたいにするとpath/to/image.pngが背景画像になります。
+せっかくだからコマンドを作りましょう。
 
-```vim
-.Image /path/to/image.png
+```
+command! -nargs=1 BGImage silent! call system("kitten @ set-background-image <args>")
 ```
 
 これなら難しくないですね！
 
-```
----
-.Image /path/to/image1.png
-.sleep 1
-.Image /path/to/image2.png
-こんにちは
-
-
----
+```vim
+.BGImage /path/to/image.png
 ```
 
-このようにすると、「こんにちは」と表示した後で1秒後に背景画像を更新します。
-同時にVOICEVOXを起動した状態でZundamonコマンドを使って…
 
-```
----
-.Zundamon こんにちは、ずんだもんなのだ。
-.Image /path/to/image1.png
-.sleep 1
-.Image /path/to/image2.png
-こんにちは、ずんだもんなのだ
-
-
----
-```
-
-こうすると、ずんだもんが動きながら喋るようになります。
 
 # TODO
 - [] neovim対応
 - [] windows対応
-- [] helpを作る
+- [] helpを作る <- 超面倒
+- Terminal対応
+  - [x] sixel対応
+  - [x] kitty対応
