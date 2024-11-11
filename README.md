@@ -4,7 +4,10 @@
 
 
 標準入出力と相性の良いvimベースのパワポもどきです。  
-現時点ではLinuxでKittyを使う事を想定しています。
+現時点ではLinuxで下記のいずれかを想定しています。
+
+- sixel対応のターミナルエミュレータでlibsixelを使う。
+- Kittyでkittyの独自プロトコルを使う。
 
 # 特徴
 - vimでパワポもどきする
@@ -37,11 +40,11 @@
 - 起動後にフォントのサイズを変えられるterminal emulator
  
 具体的にはkitty等。  
-動的に背景画像を変えられてファンシー。独自プロトコルだけど、vimでも画像を表示できるぞ。
+動的に背景画像を変えられてファンシー。独自プロトコルだけど、vimでも画像を表示できるぞ！
 
 https://sw.kovidgoyal.net/kitty/
 
-sixel対応のweztermも有力。  
+sixel対応のweztermも有力。標準的プロトコルで画像を表示できるぞ！リガチャもできてファンシー。  
 
 https://wezfurlong.org/wezterm/
 
@@ -64,57 +67,60 @@ https://github.com/uesseu/ninvoicevox
 
 # 使いかた
 ## セパレータの設定
-スライドにはセパレータが必要です。絶対に文章中で使わないような文字列をセパレータにしましょう。
-ここでは、下キーと上キーを押したら前後の```---```に飛んでいくように設定しています。
-また、スクリプトを書く場合に行頭を```.```にするようにしておきます。
-さらに、ここでは```***```をもう一つのセパレータにして、左右キーで動けるようにします。
-\*はvimの上では正規表現になってしまうので、```\*\*\*```という風にします。
+スライドにはセパレータが必要です。セパレータはデフォルトで```"""```であり、これが長くなるか短かくなるかです。
+ここでは、下キーと上キーを押したら前後の```"""""```に飛んでいくように設定しています。
+さらに、ここでは```""""""```をもう一つのセパレータにして、左右キーで動けるようにします。
 
 ```vim
-call SlideStart('<down>', '<up>', '---', '.')
-call SlideStart('<right>', '<left>', '\*\*\*', '.')
+call slide#set_key('<down>', 0, 5)
+call slide#set_key('<up>', 1, 5)
+call slide#set_key('<right>', 0, 6)
+call slide#set_key('<left>', 1, 6)
 ```
 
-2回SlideStartしてもかまいません。
+2回slide#set_keyしてもかまいません。第二引数は上に行くか下に行くかです。第三引数はダブルクォーテーションの数です。ちなみに、上記を毎回書くのだるかったので下記のプリセットが色々してくれます。
+
+```vim
+slide#start(3, '<down>', '<up>')
+```
+
 これで、こんな感じにしていきます。
 
 ```
----
-.![声を出すプログラム]
+"""
 題名1
 
 - 項目1
 - 項目2
 - 項目3
 
---- *** 
+"""EOF
+call slide#image('img.png', 0, 0, 3, 3)
+EOF
 題名2
 
 本文1
 
----
+"""
 題名3
 
 本文2
 
---- ***
-
-'\*\*\*'で横飛び、'---'で縦飛びです。
-
----
 ```
+
+vim scriptを埋めこめます。ヒアドキュメント風に書きましょう。僕は題名的に書いています。
 
 ## コマンド
 このプログラムではvim scriptを書く事ができます。
 vim scriptでは頭文字が'!'でshellscriptを書けますし、'py3'等を行頭に置くとpythonが書けます。つまり…やりたい放題ですね。
 
 ## 画面が更新されない時
-redraw!を使って下さい。
+redraw!を使って下さい。redraw!を使っても更新されなければ、vimの背景を透過させて下さい。
 
 ```
----
-.redraw!
-
+""" SCRIPT
+redraw!
+SCRIPT
 ```
 
 
@@ -123,9 +129,12 @@ redraw!を使って下さい。
 これによって、フラグメントや画像の差し替えを実現できます。
 
 ```
----
-.call slide#wait()
+""" SCRIPT
+call slide#wait()
+SCRIPT
 ```
+
+これを使う場合は必ずvimslideのページ送り機能を使って最後までエフェクトを出して下さい。手動で移動した場合でも、そのスライドのスクリプトを愚直に実行されてしまいます。
 
 ## 強調
 vimはhilightコマンドとmatchコマンドによってハイライトをします。
@@ -133,9 +142,10 @@ vimはhilightコマンドとmatchコマンドによってハイライトをし�
 ```//```の中の文字列にマッチさせます。
 
 ```
----
-.highlight Warn1 ctermbg=red ctermfg=white bold
-.match Warn1 /vim/
+""" SCRIPT
+highlight Warn1 ctermbg=red ctermfg=white bold
+match Warn1 /vim/
+SCRIPT
 ```
 
 ## フラグメント
@@ -146,15 +156,16 @@ vimはhilightコマンドとmatchコマンドによってハイライトをし�
 - slide#put_text関数でスライド中に文字列を書き加える
 
 ```
----
-.call slide#put_text(3, '')
-.call slide#wait()
-.call slide#put_text(3, '- hoge')
+"""SCRIPT
+call slide#put_text(3, '')
+call slide#wait()
+call slide#put_text(3, '- hoge')
 ```
 
 ## 画像
 sixel対応ターミナルやkittyで画像を表示できます。細かい挙動は違うかも。
 まず、ターミナルの設定をします。ここで、候補はkittyかsixelです。デフォルトはsixel。
+注意点として、特にkittyでですが、vimの背景にkittyプロトコルの画像が焼きついてしまう事があります。必ずvimの背景は透過するようにしましょう。tmux経由でもできなくなります。ここは割と気難しい。
 
 ```
 let g:slide#terminal = 'kitty'
@@ -166,10 +177,10 @@ let g:slide#terminal = 'kitty'
 call slide#image([ファイル名], [x軸], [y軸], [幅], [高さ])
 ```
 
-スライドを遷移する場合は画像を消す必要があるので、消しましょう。
+スライドを遷移する場合は画像を消える事がほとんどですが、消えない時や動的スライドの途中で消す必要がある場合は下記の通りです。
 
 ```
-call slide#clear_image([ファイル名], [x軸], [y軸], [幅], [高さ])
+call slide#clear_image()
 ```
 
 ## kittyで背景画像を動的に変える
@@ -199,7 +210,7 @@ kitty \
 これによってkittyがコマンドラインによるリモートコントロールを受けつけるようになります。なので、例えば
 
 ```
-.call silent! system("kitten @ set-background-image /path/to/image.png")
+call silent! system("kitten @ set-background-image /path/to/image.png")
 ```
 
 みたいにするとpath/to/image.pngが背景画像になります。
@@ -215,6 +226,14 @@ command! -nargs=1 BGImage silent! call system("kitten @ set-background-image <ar
 .BGImage /path/to/image.png
 ```
 
+# vim scriptコンパチ記法
+```
+""" @AboutME
+call slide#img('img.png', 0, 0, 3, 3)
+let AboutMe =<< EOF
+内容
+[EOF](EOF)
+```
 
 
 # TODO

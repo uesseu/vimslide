@@ -12,12 +12,38 @@ if exists('g:loaded_vimslide')
 endif
 let g:loaded_vimslide = 1
 let g:slide_script_enable = 1
-let g:slide#is_stopped = 0
+let g:slide#is_waiting = 0
 let g:slide#current_line = 1
 " iterm, sixel, kitty, wezterm_icat
 let g:slide#terminal = 'sixel'
 
-function! slide#goto(sep='---', up=0, command_flag='.')
+function! slide#get_heredoc_text(line)
+  let s:sep = split(getline(a:line), '"')
+  return len(s:sep) == 0 ? '' : trim(s:sep[-1])
+endfunction
+
+
+function! slide#_goto_vim_heredoc(showline, eof)
+  let s:showline = a:showline
+  let s:split_line = split(getline(s:showline), ' ')
+  while trim(s:split_line[0]) != 'let' || trim(s:split_line[1]) != trim(a:eof)
+    let s:split_line = split(getline(s:showline), ' ')
+    let s:showline = s:showline + 1
+  endwhile
+  return s:showline
+endfunction
+
+function! slide#_goto_heredoc(showline, eof)
+  let s:showline = a:showline
+  let s:line = getline(s:showline)
+  while trim(s:line) != trim(a:eof)
+    let s:line = getline(s:showline)
+    let s:showline = s:showline + 1
+  endwhile
+  return s:showline
+endfunction
+
+function! slide#goto(sep='"""', up=0)
   " Return -1 if stop mode. Else, return line to run.
   if g:slide#is_waiting
     return -1
@@ -28,74 +54,75 @@ function! slide#goto(sep='---', up=0, command_flag='.')
   else
     let s:curline = search(a:sep)
   endif
+  let s:eof = slide#get_heredoc_text(s:curline)
   let s:showline = s:curline + 1
-  while 1
-    let s:line = getline(s:showline)
-    if s:line[0] == a:command_flag
-      while getline(s:showline)[strlen(getline(s:showline))-1] == "\\"
-        let s:showline = s:showline + 1
-      endwhile
-      let s:showline = s:showline + 1
-    else
-      break
-    endif
-  endwhile
+  if s:eof == ''
+    let s:showline = slide#_goto_heredoc(s:showline)
+  elseif s:eof[0] == '@'
+    let s:showline = slide#_goto_vim_heredoc(s:showline, s:eof[1:])
+  else
+    let s:showline = slide#_goto_heredoc(s:showline, s:eof)
+  endif
   call cursor(s:showline, 0)
   exec "norm z\n"
   return s:curline + 1
-  "call slide#run(s:curline+1, a:command_flag)
 endfunction
 
-
-function slide#run(line=0, command_flag='.', sep='---')
-  if a:line == 0
-    let s:line = search(a:sep, 'b')+1
-  elseif a:line == -1
-    let g:slide#is_waiting = 0
-    let s:line = g:slide#current_line
-  else
-    let s:line = a:line
-  endif
-  if g:slide_script_enable == 0
-    return
-  endif
+function slide#_run_heredoc_based(curline, eof)
+  let s:curline = a:curline
   let s:command = ''
-  let s:curline = s:line
-  while 1
+  while s:curline < line('$')
     " Stop if wait mode
     if g:slide#is_waiting == 1
       let g:slide#current_line = s:curline
       return
     endif
     let s:str = getline(s:curline)
-    " Run shell if head is '!'
-    if s:str[0] == a:command_flag
-      while s:str[strlen(s:str)-1] == "\\"
-        let s:command = s:command . s:str[:-1]
-        let s:curline = s:curline + 1
-        let s:str = getline(s:curline)
-      endwhile
+    if trim(s:str) != trim(a:eof) && s:curline != line('$')
+      let s:next_line = trim(getline(s:curline+1))
       let s:command = s:command . s:str
-      if s:command[0] == a:command_flag
-        silent! exec s:command[1:]
-      endif
+      while s:next_line[0] == "\\"
+        let s:command = s:command . s:next_line
+        let s:curline = s:curline + 1
+        let s:next_line = trim(getline[s:curline+1])
+      endwhile
+      silent! exec trim(s:command)
       let s:command = ''
-    " Run vim script if head is '.'
     else
       break
     endif
     let s:curline = s:curline + 1
   endwhile
+  let s:curline = s:curline + 1
+  return s:curline
 endfunction
 
-function slide#go_and_run(forward='<down>', backward='<up>', sep='---', command_flag='.')
-  silent! call slide#run(slide#goto('".a:sep."', 0, '".a:command_flag."'), '.', '".a:sep."')
+function slide#run(line=0, sep='"""')
+  if a:line == 0
+    " When you want to run current slide script.
+    let s:line = search(a:sep, 'b')+1
+    let g:slide#eof = slide#get_heredoc_text(s:line-1)
+  elseif a:line == -1
+    " When it is in waiting mode.
+    let g:slide#is_waiting = 0
+    let s:line = g:slide#current_line
+  else
+    " When line is valid number.
+    let s:line = a:line
+    let g:slide#eof = slide#get_heredoc_text(s:line-1)
+  endif
+  if g:slide_script_enable == 0
+    return
+  endif
+  let s:curline = s:line
+  call slide#_run_heredoc_based(s:curline, g:slide#eof)
 endfunction
+
 
 let g:slide#keys = []
 let g:slide#command_num = 0
 
-function slide#start(forward='<down>', backward='<up>', sep='---', command_flag='.')
+function slide#start(sep_num=3, forward='<down>', backward='<up>')
   set nocompatible
   set noruler
   set nonumber
@@ -117,15 +144,15 @@ function slide#start(forward='<down>', backward='<up>', sep='---', command_flag=
     highlight Folded ctermbg=none
     highlight EndOfBuffer ctermbg=none
   endif
-  call slide#set_key(a:forward, 0, a:sep, a:command_flag)
-  call slide#set_key(a:backward, 1, a:sep, a:command_flag)
+  call slide#set_key(a:forward, 0, a:sep_num)
+  call slide#set_key(a:backward, 1, a:sep_num)
 endfunction
 
-function slide#set_key(key, direction=0, sep='---', command_flag='.')
+
+function slide#set_key(key, direction=0, sep_num=3)
   let g:slide#keys = g:slide#keys +
         \[{'direction': a:direction,
-        \  'sep': a:sep,
-        \  'command_flag': a:command_flag
+        \  'sep': '^'.repeat('"', a:sep_num),
         \}]
   exec $"nnoremap {a:key} :call slide#next({g:slide#command_num})<CR>:<ESC>"
   let g:slide#command_num = g:slide#command_num + 1
@@ -133,9 +160,7 @@ endfunction
 
 function slide#next(num)
   let s:arg = g:slide#keys[a:num]
-  silent! call slide#run(slide#goto(
-        \s:arg['sep'], s:arg['direction'], s:arg['command_flag']),
-        \s:arg['command_flag'], s:arg['sep'])
+  silent! call slide#run(slide#goto(s:arg['sep'], s:arg['direction']),s:arg['sep'])
 endfunction
 
 function slide#wait()
