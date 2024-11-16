@@ -1,0 +1,187 @@
+*vimslide.txt*	Slide by vim.
+
+Author: Shoichiro Nakanishi <sheepwing@kyudai.jp>
+License: MIT license
+
+==============================================================================
+CONTENTS                                                        *slide-contents*
+
+Introduction		|slide-introduction|
+Configuration  	 	|slide-configuration|
+Usage	  	 	|slide-usage|
+Command			|slide-command|
+Function		|slide-functions|
+
+==============================================================================
+INTRODUCTION                                                *slide-introduction*
+
+Let's use vim as a presentation software ;)
+
+==============================================================================
+CONFIGURATION                                          	  *slide-configuration*
+
+								*g:slide#terminal*
+g:slide#terminal
+    Terminal emulator to use.
+    'kitty':
+        Use kitty, GPU accelerated terminal.
+	Kitty uses it's own protocol and it is not compatible with other
+	terminal emulators.
+    'sixel':
+        Use libsixel, sixel software for terminals with sixel.
+	Even if it works many terminal emulators, it is not efficient and it
+	cannot work properly in some cases.
+    'iterm':
+        Use iterm2 protocol. Iterm2 is terminal emulator for macOS and I have
+	no Mac. And so, it was not tested. Can you test it?
+    'wezterm-iterm':
+        Use iterm2 protocol in wezterm. However wezterm supports sixel and
+	kitty and iterm protocol. It may perform better than sixel in wezterm.
+
+							    *g:slide#is_waiting*
+g:slide#is_waiting = 0
+    Whether slide is waiting or not.
+    It is not configuration, but you can change it.
+    If it is 1, current slide is waiting and you can hit key to go next.
+
+							    *g:slide#current_line*
+  g:slide#current_line = 1
+    Line of script of waiting slide.
+
+							    *g:slide_script_enable*
+g:slide_script_enable = 1
+    Enable slide script or not. If it is 0, script will not work.
+    It may be useful when you just edit slide.
+==============================================================================
+How to write slides                                               *slide-usage*
+
+------------------------------------------------------------------------------
+The simple way                                                    *slide*
+
+Default separator is ["""] and default key is <down> and <up>.
+
+Example:
+  >
+  """
+  Contents1
+
+  """
+  Contents2
+
+  ...
+
+
+------------------------------------------------------------------------------
+Slide script                                                     *slide-script*
+
+It is like here document. Just name section and write vim script.
+The name cannot involve white spaces.
+
+Example:
+  >
+  """ First
+  call slide#image('img1.png', 0, 0, 3, 3)
+  First
+  Contents1
+
+  """ Second
+  call slide#image('img2.png', 0, 0, 3, 3)
+  Second
+  Contents2
+
+  ...
+
+------------------------------------------------------------------------------
+Slide script with vim script                   *slide-script-with-vim-script*
+
+If you want to use syntax highlight or completion, you can write
+a slide as a vim script.
+You should add @ in front of section name and make a variable
+of same name. The variable should be used with here document.
+
+Example:
+  >
+  """ @First
+  call slide#image('img1.png', 0, 0, 3, 3)
+  let First =<< BODY
+  Contents1
+  BODY
+
+  """ @Second
+  call slide#image('img2.png', 0, 0, 3, 3)
+  let Second =<< BODY
+  Contents2
+  BODY
+
+  ...
+
+==============================================================================
+Command                                                 *slide-command*
+
+SlideStart
+	Only one command of this plugin.
+	It can take 1 argument and set separator number of double quotation.
+	Then, """"" will be separator.
+	This command is used when I start presentation.
+
+Example in vim command line:
+	:SlideStart 5
+
+Example in shell:
+	vim slide.txt +SlideStart
+	vim slide.txt +'SlideStart 6'
+
+==============================================================================
+Functions                                                 *slide-functions*
+
+                                                          *slide#start()*
+function slide#start({sep_num=3}, {forward='<down>'}, {backward='<up>'})
+	The easiest way to start presentation. (not simple way)
+	It run |slide#set_key()| and several configuration.
+	{sep_num} is number of double quotation, which is in separator.
+	{forward} is key to go next slide.
+	{backward} is key to go previous slide.
+
+                                                          *slide#set_key()*
+function slide#set_key({key}, {direction=0}, {sep_num=3})
+	Set key to use slide.
+	{key} is key to move slide.
+	If {direction} is 0, go next, else go previous.
+	{sep_num} is number of double quotation, which is in separator.
+
+							    *slide#image()*
+function slide#image({fname}, {x=0}, {y=0}, {width=0}, {height=0}) 
+        Draw image in slide. It depends on supported protocols of terminal
+	emulators. Please configure |g:slide#terminal| before use it.
+
+							    *slide#clear_image()*
+function slide#clear_image()
+	Just clear images in slide.
+
+
+							    *slide#wait()*
+function slide#wait()
+	Wait current slide.
+
+							    *slide#put_text()*
+function slide#put_text({line}, {text})
+	Put text in the slide. You can replace {text} into {line} th
+	line of slide.
+
+							    *slide#hide_cursor()*
+function slide#hide_cursor()
+	If cursor is big, it makes it small.
+
+							    *slide#next()*
+function slide#next({num})
+	Go to next slide and run the script. {num} is key stroke number,
+	reigistered by |slide#set_key| function.
+	In almost all the situation, you need not use this.
+	You need it when automated slide.
+
+							    *slide#run()*
+function slide#run()
+	Run the slide script of current slide.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:noet:fen:noet:
