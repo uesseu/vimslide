@@ -194,8 +194,8 @@ function slide#hide_cursor()
 endfunction
 
 function slide#_get_pos_percent(direction, pos)
-  let s:whole_comm = a:direction == 'x' ? 'cols' : 'lines'
-  return a:pos * 100 / trim(system($'tput {s:whole_comm}'))
+  let s:whole_comm = a:direction == 'x' ? &columns : &lines
+  return a:pos * 100 / s:whole_comm
 endfunction
 
 function slide#image(fname, x=0, y=0, width=0, height=0) 
