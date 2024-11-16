@@ -14,8 +14,10 @@ let g:loaded_vimslide = 1
 let g:slide_script_enable = 1
 let g:slide#is_waiting = 0
 let g:slide#current_line = 1
-" iterm, sixel, kitty, wezterm_icat
-let g:slide#terminal = 'sixel'
+" iterm, sixel, kitty, wezterm-iterm
+if !exists('g:slide#terminal')
+  let g:slide#terminal = 'sixel'
+endif
 
 function! slide#get_heredoc_text(line)
   let s:sep = split(getline(a:line), '"')
@@ -23,20 +25,33 @@ function! slide#get_heredoc_text(line)
 endfunction
 
 
-function! slide#_goto_vim_heredoc(showline, eof)
+function! slide#_goto_vim_heredoc(showline, eof, sep)
   let s:showline = a:showline
-  let s:split_line = split(getline(s:showline), ' ')
-  while trim(s:split_line[0]) != 'let' || trim(s:split_line[1]) != trim(a:eof)
-    let s:split_line = split(getline(s:showline), ' ')
+  while 1
+    let s:mcurline = getline(s:showline)
+    if match(s:mcurline, a:sep) == 0
+      return a:showline
+    endif
+    let s:split_line = split(s:mcurline, ' ')
+    if trim(s:split_line[0]) == 'let' && trim(s:split_line[1]) == trim(a:eof)
+      break
+    endif
     let s:showline = s:showline + 1
   endwhile
-  return s:showline
+  return s:showline + 1
 endfunction
 
-function! slide#_goto_heredoc(showline, eof)
+function! slide#_goto_heredoc(showline, eof, sep)
   let s:showline = a:showline
   let s:line = getline(s:showline)
-  while trim(s:line) != trim(a:eof)
+  while 1
+    let s:mcurline = getline(s:showline)
+    if match(s:mcurline, a:sep) == 0
+      return a:showline
+    endif
+    if trim(s:line) == trim(a:eof)
+      break
+    endif
     let s:line = getline(s:showline)
     let s:showline = s:showline + 1
   endwhile
@@ -59,9 +74,9 @@ function! slide#goto(sep='"""', up=0)
   if s:eof == ''
     let s:showline = slide#_goto_heredoc(s:showline)
   elseif s:eof[0] == '@'
-    let s:showline = slide#_goto_vim_heredoc(s:showline, s:eof[1:])
+    let s:showline = slide#_goto_vim_heredoc(s:showline, s:eof[1:], a:sep)
   else
-    let s:showline = slide#_goto_heredoc(s:showline, s:eof)
+    let s:showline = slide#_goto_heredoc(s:showline, s:eof, a:sep)
   endif
   call cursor(s:showline, 0)
   exec "norm z\n"
@@ -178,29 +193,49 @@ function slide#hide_cursor()
   call s:echoraw("\x1b[6 q")
 endfunction
 
+function slide#_get_pos_percent(direction, pos)
+  let s:whole_comm = a:direction == 'x' ? 'cols' : 'lines'
+  return a:pos * 100 / trim(system($'tput {s:whole_comm}'))
+endfunction
+
 function slide#image(fname, x=0, y=0, width=0, height=0) 
+  let s:echoraw = has('nvim')
+        \? {str -> chansend(v:stderr, str)}
+        \: {str->echoraw(str)}
+  call s:echoraw("\x1b[s")
   if g:slide#terminal == 'sixel'
-    let s:echoraw = has('nvim')
-          \? {str -> chansend(v:stderr, str)}
-          \: {str->echoraw(str)}
-    call s:echoraw("\x1b[s")
-    call s:echoraw($"\x1b[{a:y};{a:x}H")
-    let s:width = a:width != 0 ? $" -w {a:width}" : ''
-    let s:height = a:height != 0 ? $" -w {a:height}" : ''
-    call s:echoraw(system($"img2sixel {a:fname}{s:width}{s:height}"))
+    let s:y = slide#_get_pos_percent('y', a:y)
+    let s:x = slide#_get_pos_percent('x', a:x)
+    let s:width = a:width != 0 ? slide#_get_pos_percent('x', a:width): 0
+    let s:height = a:height != 0 ? slide#_get_pos_percent('y', a:height): 0
+    call s:echoraw($"\x1b[{s:y};{s:x}H")
+    let s:width_comm = a:width != 0 ? $" -w {s:width}%" : ' -w auto'
+    let s:height_comm = a:height != 0 ? $" -h {s:height}%" : ' -h auto'
+    call s:echoraw(system($"img2sixel {a:fname}{s:width_comm}{s:height_comm}"))
     call s:echoraw("\x1b[u")
-  elseif g:slide#terminal == 'iterm'
+  elseif g:slide#terminal == 'wezterm-iterm'
+    let s:width = a:width != 0 ? slide#_get_pos_percent('x', a:width): 0
+    let s:height = a:height != 0 ? slide#_get_pos_percent('y', a:height): 0
+    let s:y = slide#_get_pos_percent('y', a:y)
+    let s:x = slide#_get_pos_percent('x', a:x)
     let s:width = a:width != 0 ? $" --width {a:width}" : ''
     let s:height = a:height != 0 ? $" --height {a:height}" : ''
-    call s:echoraw(system($"imgcat {a:fname}{s:width}{s:height} --position{x},{y}"))
+    call s:echoraw(system($"wezterm imgcat {a:fname}{s:width}{s:height} --position={s:x},{s:y}"))
   elseif g:slide#terminal == 'kitty'
-    silent! call system($'kitten icat --place {a:width}x{a:height}@{a:x}x{a:y} {a:fname} >/dev/tty </dev/tty')
+    if a:width != 0 && a:width != 0
+      let s:attr = $"--place {a:width}x{a:height}@{a:x}x{a:y}"
+    else
+      let s:attr = ""
+    endif
+    silent! call system($'kitten icat {s:attr} {a:fname} >/dev/tty </dev/tty')
   endif
 endfunction
 
 function slide#clear_image()
   redraw!
 endfunction
+
+command! -nargs=? SlideStart call slide#start(<args>)
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
