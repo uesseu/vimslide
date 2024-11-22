@@ -235,6 +235,34 @@ function slide#clear_image()
   redraw!
 endfunction
 
+function slide#do_nothing(arg)
+  return 0
+endfunction
+
+func! slide#callback_echo(channel)
+  while ch_status(a:channel, {'part': 'out'}) == 'buffered'
+    echomsg ch_read(a:channel)
+  endwhile
+endfunc
+
+
+func! slide#wait_sh(time, command, callback='slide#do_nothing')
+  let s:command=[$"sleep {a:time}", a:command]
+  let s:command = join(s:command, ';')
+  let job = job_start(['sh', '-c', s:command], {'close_cb': a:callback})
+  return job
+endfunction
+
+func! slide#wait_vim(time, tmpcommand)
+  let s:tmpcommand = a:tmpcommand
+  func! TmpFunc(m)
+    exec s:tmpcommand
+  endfun
+  let job = timer_start(float2nr(a:time*1000), 'TmpFunc')
+  return job
+endfunction
+
+
 command! -nargs=? SlideStart call slide#start(<args>)
 
 let &cpo = s:save_cpo
