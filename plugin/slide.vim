@@ -94,7 +94,6 @@ function slide#_is_wait_line(line)
 endfunction
 
 function slide#_run_heredoc_based(curline, eof, sep)
-  echomsg a:eof
   let s:curline = a:curline
   let s:command = ''
   while s:curline < line('$')
