@@ -28,7 +28,7 @@ endfunction
 function! slide#_goto_vim_heredoc(showline, eof, sep)
   let s:showline = a:showline
   while 1
-    let s:mcurline = getline(s:showline)
+    let s:mcurline = trim(getline(s:showline))
     if match(s:mcurline, a:sep) == 0
       return a:showline
     endif
@@ -49,7 +49,7 @@ function! slide#_goto_heredoc(showline, eof, sep)
     if match(s:mcurline, a:sep) == 0
       return a:showline
     endif
-    if trim(s:line) == trim(a:eof)
+    if a:eof != '' && trim(s:line) == trim(a:eof)
       break
     endif
     let s:line = getline(s:showline)
@@ -72,7 +72,7 @@ function! slide#goto(sep='"""', up=0)
   let s:eof = slide#get_heredoc_text(s:curline)
   let s:showline = s:curline + 1
   if s:eof == ''
-    let s:showline = slide#_goto_heredoc(s:showline)
+    let s:showline = slide#_goto_heredoc(s:showline, s:eof, a:sep)
   elseif s:eof[0] == '@'
     let s:showline = slide#_goto_vim_heredoc(s:showline, s:eof[1:], a:sep)
   else
@@ -83,54 +83,53 @@ function! slide#goto(sep='"""', up=0)
   return s:curline + 1
 endfunction
 
-function slide#_run_heredoc_based(curline, eof)
+function slide#_is_wait_line(line)
+  let s:split_line = split(getline(a:line), ' ')
+  if len(s:split_line) < 2
+    return 0
+  elseif trim(s:split_line[0]) == 'call' && trim(s:split_line[1])[:9] == 'slide#wait'
+    return 1
+  endif
+  return 0
+endfunction
+
+function slide#_run_heredoc_based(curline, eof, sep)
+  echomsg a:eof
   let s:curline = a:curline
   let s:command = ''
   while s:curline < line('$')
     " Stop if wait mode
-    if g:slide#is_waiting == 1
-      let g:slide#current_line = s:curline
+    if slide#_is_wait_line(s:curline) == 1
+      let g:slide#current_line = s:curline + 1
+      exec $"{a:curline},{s:curline}source"
       return
-    endif
-    let s:str = getline(s:curline)
-    if trim(s:str) != trim(a:eof) && s:curline != line('$')
-      let s:next_line = trim(getline(s:curline+1))
-      let s:command = s:command . s:str
-      while s:next_line[0] == "\\"
-        let s:command = s:command . s:next_line
-        let s:curline = s:curline + 1
-        let s:next_line = trim(getline[s:curline+1])
-      endwhile
-      silent! exec trim(s:command)
-      let s:command = ''
-    else
+    elseif trim(getline(s:curline)) == trim(a:eof)
+      exec $"{a:curline},{s:curline-1}source"
       break
+    elseif match(getline(s:curline), trim(a:sep)) > -1
+      exec $"{a:curline},{s:curline}source"
+      return
     endif
     let s:curline = s:curline + 1
   endwhile
-  let s:curline = s:curline + 1
-  return s:curline
 endfunction
 
-function slide#run(line=0, sep='"""')
-  if a:line == 0
-    " When you want to run current slide script.
-    let s:line = search(a:sep, 'b')+1
-    let g:slide#eof = slide#get_heredoc_text(s:line-1)
-  elseif a:line == -1
+function slide#run(line=0, sep='^"""')
+  if a:line == -1
     " When it is in waiting mode.
     let g:slide#is_waiting = 0
     let s:line = g:slide#current_line
+    let g:slide#eof = slide#get_heredoc_text(search(a:sep, 'bn'))
   else
-    " When line is valid number.
-    let s:line = a:line
+    let s:line = a:line == 0 ? search(a:sep, 'bn')+1 : a:line
     let g:slide#eof = slide#get_heredoc_text(s:line-1)
   endif
-  if g:slide_script_enable == 0
+  if g:slide#eof == ''
+    return
+  elseif g:slide_script_enable == 0
     return
   endif
-  let s:curline = s:line
-  call slide#_run_heredoc_based(s:curline, g:slide#eof)
+  call slide#_run_heredoc_based(s:line, g:slide#eof, a:sep)
 endfunction
 
 
@@ -175,7 +174,7 @@ endfunction
 
 function slide#next(num)
   let s:arg = g:slide#keys[a:num]
-  silent! call slide#run(slide#goto(s:arg['sep'], s:arg['direction']),s:arg['sep'])
+  call slide#run(slide#goto(s:arg['sep'], s:arg['direction']),s:arg['sep'])
 endfunction
 
 function slide#wait()
@@ -227,7 +226,7 @@ function slide#image(fname, x=0, y=0, width=0, height=0)
     else
       let s:attr = ""
     endif
-    silent! call system($'kitten icat {s:attr} {a:fname} >/dev/tty </dev/tty')
+    call system($'kitten icat {s:attr} {a:fname} >/dev/tty </dev/tty')
   endif
 endfunction
 
