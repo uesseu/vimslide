@@ -20,7 +20,7 @@ if !exists('g:slide#terminal')
 endif
 
 function! slide#get_heredoc_text(line)
-  let s:sep = split(getline(a:line), '"')
+  let s:sep = getline(a:line)->split('"')
   return len(s:sep) == 0 ? '' : trim(s:sep[-1])
 endfunction
 
@@ -33,7 +33,7 @@ function! slide#_goto_vim_heredoc(showline, eof, sep)
       return a:showline
     endif
     let s:split_line = split(s:mcurline, ' ')
-    if trim(s:split_line[0]) == 'let' && trim(s:split_line[1]) == trim(a:eof)
+    if len(s:split_line) > 1 && trim(s:split_line[0]) == 'let' && trim(s:split_line[1]) == trim(a:eof)
       break
     endif
     let s:showline = s:showline + 1
@@ -102,10 +102,10 @@ function slide#_run_heredoc_based(curline, eof, sep)
       let g:slide#current_line = s:curline + 1
       exec $"{a:curline},{s:curline}source"
       return
-    elseif trim(getline(s:curline)) == trim(a:eof)
+    elseif getline(s:curline)->trim() == a:eof->trim()
       exec $"{a:curline},{s:curline-1}source"
       break
-    elseif match(getline(s:curline), trim(a:sep)) > -1
+    elseif getline(s:curline)->match(trim(a:sep)) > -1
       exec $"{a:curline},{s:curline}source"
       return
     endif
@@ -196,36 +196,69 @@ function slide#_get_pos_percent(direction, pos)
   return a:pos * 100 / s:whole_comm
 endfunction
 
-function slide#image(fname, x=0, y=0, width=0, height=0) 
+function! slide#chip(fname, compose='over', geometry='+0+0')
+  return #{fname: a:fname, compose: a:compose, geometry: a:geometry}
+endfunction
+
+function! slide#canvas(images, output='tmp', type='file')
+  let s:code = $"magick {a:images[0]["fname"]} "
+  let s:suffix = ''
+  if a:type == 'fifo'
+    call system($'rm {a:output}')
+    call system($'mkfifo {a:output}')
+    let s:suffix = '&'
+  endif
+  for image in a:images[1:]
+    let s:code = s:code.$"  {image['fname']} -geometry {image['geometry']}
+          \ -compose {image['compose']} -composite  "
+  endfor
+  let s:result = #{fname: a:output, type: a:type}
+  let s:result["job"] = system(s:code." -format png - " . $" > {a:output} {s:suffix}")
+  return s:result
+endfunction
+
+function slide#image(fname, pos=[0, 0, 0, 0])
+  if type(a:fname) == v:t_dict
+    let s:fname = $"< {a:fname["fname"]}"
+    let s:is_canvas = 1
+  else
+    let s:arg = trim(a:fname)
+    let s:kitten_suffix = s:arg[len(s:arg)-1] != '|' ? a:fname : " </dev/tty"
+    let s:fname = s:arg[len(s:arg)-1] == '|' ? a:fname : $"< {a:fname}"
+    let s:is_canvas = 0
+  endif
   let s:echoraw = has('nvim')
         \? {str -> chansend(v:stderr, str)}
         \: {str->echoraw(str)}
   call s:echoraw("\x1b[s")
   if g:slide#terminal == 'sixel'
-    let s:y = slide#_get_pos_percent('y', a:y)
-    let s:x = slide#_get_pos_percent('x', a:x)
-    let s:width = a:width != 0 ? slide#_get_pos_percent('x', a:width): 0
-    let s:height = a:height != 0 ? slide#_get_pos_percent('y', a:height): 0
+    let s:y = slide#_get_pos_percent('y', a:pos[1])
+    let s:x = slide#_get_pos_percent('x', a:pos[0])
+    let s:width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
+    let s:height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
     call s:echoraw($"\x1b[{s:y};{s:x}H")
-    let s:width_comm = a:width != 0 ? $" -w {s:width}%" : ' -w auto'
-    let s:height_comm = a:height != 0 ? $" -h {s:height}%" : ' -h auto'
-    call s:echoraw(system($"img2sixel {a:fname}{s:width_comm}{s:height_comm}"))
+    let s:width_comm = a:pos[2] != 0 ? $" -w {s:width}%" : ' -w auto'
+    let s:height_comm = a:pos[3] != 0 ? $" -h {s:height}%" : ' -h auto'
+    call s:echoraw(system($"{s:fname} img2sixel {s:width_comm}{s:height_comm}"))
     call s:echoraw("\x1b[u")
   elseif g:slide#terminal == 'wezterm-iterm'
-    let s:width = a:width != 0 ? slide#_get_pos_percent('x', a:width): 0
-    let s:height = a:height != 0 ? slide#_get_pos_percent('y', a:height): 0
-    let s:y = slide#_get_pos_percent('y', a:y)
-    let s:x = slide#_get_pos_percent('x', a:x)
-    let s:width = a:width != 0 ? $" --width {a:width}" : ''
-    let s:height = a:height != 0 ? $" --height {a:height}" : ''
-    call s:echoraw(system($"wezterm imgcat {a:fname}{s:width}{s:height} --position={s:x},{s:y}"))
+    let s:width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
+    let s:height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
+    let s:y = slide#_get_pos_percent('y', a:pos[1])
+    let s:x = slide#_get_pos_percent('x', a:pos[0])
+    let s:width = a:pos[2] != 0 ? $" --width {a:pos[2]}" : ''
+    let s:height = a:pos[3] != 0 ? $" --height {a:pos[3]}" : ''
+    call s:echoraw(system($"{s:fname} wezterm imgcat {s:width}{s:height} --position={s:x},{s:y}"))
   elseif g:slide#terminal == 'kitty'
-    if a:width != 0 && a:width != 0
-      let s:attr = $"--place {a:width}x{a:height}@{a:x}x{a:y}"
+    if a:pos[2] != 0 && a:pos[2] != 0
+      let s:attr = $"--place {a:pos[2]}x{a:pos[3]}@{a:pos[0]}x{a:pos[1]}"
     else
       let s:attr = ""
     endif
-    call system($'kitten icat {s:attr} {a:fname} >/dev/tty </dev/tty')
+    call system($'{s:fname} kitten icat {s:attr} >/dev/tty ')
+  endif
+  if a:fname["type"] == 'fifo'
+    call system($'rm {a:fname["fname"]}')
   endif
 endfunction
 
@@ -244,22 +277,16 @@ func! slide#callback_echo(channel)
 endfunc
 
 
-func! slide#wait_sh(time, command, callback='slide#do_nothing')
-  let s:command=[$"sleep {a:time}", a:command]
-  let s:command = join(s:command, ';')
-  let job = job_start(['sh', '-c', s:command], {'close_cb': a:callback})
-  return job
+function! slide#_wrapper(x, y)
+  exec a:x
 endfunction
 
-func! slide#wait_vim(time, tmpcommand)
-  let s:tmpcommand = a:tmpcommand
-  func! TmpFunc(m)
-    exec s:tmpcommand
-  endfun
-  let job = timer_start(float2nr(a:time*1000), 'TmpFunc')
+func! slide#timer_sh(time, command, callback='call slide#do_nothing()')
+  let s:command=[$"sleep {str2float(a:time)/1000}", a:command]->join(';')
+  let job = job_start(['sh', '-c', s:command],
+        \{'close_cb': 'slide#_wrapper'->function([a:callback])})
   return job
 endfunction
-
 
 command! -nargs=? SlideStart call slide#start(<args>)
 

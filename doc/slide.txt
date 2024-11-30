@@ -150,9 +150,34 @@ function slide#set_key({key}, {direction=0}, {sep_num=3})
 	{sep_num} is number of double quotation, which is in separator.
 
 							    *slide#image()*
-function slide#image({fname}, {x=0}, {y=0}, {width=0}, {height=0}) 
+function slide#image({fname}, {pos=[0,0,0,0]}) 
         Draw image in slide. It depends on supported protocols of terminal
 	emulators. Please configure |g:slide#terminal| before use it.
+	Pos is list of image position and size.
+	The conten is [x, y, width, height].
+
+							    *slide#chip()*
+function slide#chip({fname}, {compose='over'}, {geometry='+0+0'})
+        Make command to imagemagick to make image.
+	slide#chip makes small chip of image.
+	This is used with slide#canvas().
+
+							    *slide#canvas()*
+function! slide#canvas({images}, {output='tmp'}, {type='file'})
+        Images is list of slide#chip.
+        Make image with imagemagick.
+	If type is 'file', it makes file. The file name is same as {output}.
+	If type is 'fifo', it makes named pipe.
+	The file name is same as {output}.
+	Fifo may be not very fast in this case.
+Example: >
+        let g:Mo = slide#canvas(
+              \[slide#chip('background.png'),
+              \slide#chip($'zundamon1.png')],
+              \$"zunfifo.png")
+        call slide#image(g:Mo, [10, 10, 20, 20])
+<
+This example displays zundamon over the background.
 
 							    *slide#clear_image()*
 function slide#clear_image()
