@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/96b01466-7b02-4914-9e93-608d2a879f55
+
 # vimslide
 標準入出力と相性の良いvimベースのパワポもどきです。  
 現時点ではLinuxやMACで下記のいずれかを想定しています。
