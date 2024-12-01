@@ -186,7 +186,8 @@ function slide#clear_image()
 
 							    *slide#wait()*
 function slide#wait()
-	Wait current slide.
+	Stop reading script until slide#next() is called.
+	It is useful when you want to make dynamic slide.
 
 							    *slide#put_text()*
 function slide#put_text({line}, {text})
