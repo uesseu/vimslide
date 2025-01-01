@@ -266,10 +266,6 @@ function slide#clear_image()
   redraw!
 endfunction
 
-function slide#do_nothing(arg)
-  return 0
-endfunction
-
 func! slide#callback_echo(channel)
   while ch_status(a:channel, {'part': 'out'}) == 'buffered'
     echomsg ch_read(a:channel)
@@ -281,14 +277,7 @@ function! slide#_wrapper(x, y)
   exec a:x
 endfunction
 
-func! slide#timer_sh(time, command, callback='call slide#do_nothing()')
-  let s:command=[$"sleep {str2float(a:time)/1000}", a:command]->join(';')
-  let job = job_start(['sh', '-c', s:command],
-        \{'close_cb': 'slide#_wrapper'->function([a:callback])})
-  return job
-endfunction
-
-command! -nargs=? SlideStart call slide#start(<args>)
+command -nargs=? SlideStart call slide#start(<args>)
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
