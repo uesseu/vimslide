@@ -96,21 +96,22 @@ endfunction
 function slide#_run_heredoc_based(curline, eof, sep)
   let s:curline = a:curline
   let s:command = ''
-  while s:curline < line('$')
+  while s:curline < line('$') + 1
     " Stop if wait mode
     if slide#_is_wait_line(s:curline) == 1
       let g:slide#current_line = s:curline + 1
       exec $"{a:curline},{s:curline}source"
       return
-    elseif getline(s:curline)->trim() == a:eof->trim()
+    elseif s:curline->getline()->trim() == a:eof->trim()
       exec $"{a:curline},{s:curline-1}source"
       break
-    elseif getline(s:curline)->match(trim(a:sep)) > -1
+    elseif s:curline->getline()->match(a:sep->trim()) > -1
       exec $"{a:curline},{s:curline}source"
       return
     endif
     let s:curline = s:curline + 1
   endwhile
+  exec $"{a:curline},{s:curline-1}source"
 endfunction
 
 function slide#run(line=0, sep='^"""')
