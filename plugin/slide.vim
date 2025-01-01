@@ -33,7 +33,7 @@ function! slide#_goto_vim_heredoc(showline, eof, sep)
       return a:showline
     endif
     let s:split_line = split(s:mcurline, ' ')
-    if len(s:split_line) > 1 && trim(s:split_line[0]) == 'let' && trim(s:split_line[1]) == trim(a:eof)
+    if len(s:split_line) > 1 && trim(s:split_line[0]) == 'let' && split(s:split_line[1], '=')[0] == trim(a:eof)
       break
     endif
     let s:showline = s:showline + 1
