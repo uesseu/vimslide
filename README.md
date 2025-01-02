@@ -225,6 +225,13 @@ command! -nargs=1 BGImage silent! call system("kitten @ set-background-image <ar
 ```
 
 # vim scriptコンパチ記法
+```@```をヒアドキュメント風記法につけて下さい。
+そんで、実際にヒアドキュメントを書いて下さい。
+そうすると、vim scriptとして矛盾しない記法にできます。
+つまり、vimの支援を受けられるわけです。
+内容はヒアドキュメントの内容を表示することになります。
+あとは適当にスクリプトを書けばいいです。
+
 ```
 """ @AboutME
 call slide#img('img.png', 0, 0, 3, 3)
