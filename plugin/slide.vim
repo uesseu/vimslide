@@ -20,42 +20,42 @@ if !exists('g:slide#terminal')
 endif
 
 function! slide#get_heredoc_text(line)
-  let s:sep = getline(a:line)->split('"')
-  return len(s:sep) == 0 ? '' : trim(s:sep[-1])
+  let sep = getline(a:line)->split('"')
+  return len(sep) == 0 ? '' : trim(sep[-1])
 endfunction
 
 
 function! slide#_goto_vim_heredoc(showline, eof, sep)
-  let s:showline = a:showline
+  let showline = a:showline
   while 1
-    let s:mcurline = trim(getline(s:showline))
-    if match(s:mcurline, a:sep) == 0
+    let mcurline = trim(getline(showline))
+    if match(mcurline, a:sep) == 0
       return a:showline
     endif
-    let s:split_line = split(s:mcurline, ' ')
-    if len(s:split_line) > 1 && trim(s:split_line[0]) == 'let' && split(s:split_line[1], '=')[0] == trim(a:eof)
+    let split_line = split(mcurline, ' ')
+    if len(split_line) > 1 && trim(split_line[0]) == 'let' && split(split_line[1], '=')[0] == trim(a:eof)
       break
     endif
-    let s:showline = s:showline + 1
+    let showline = showline + 1
   endwhile
-  return s:showline + 1
+  return showline + 1
 endfunction
 
 function! slide#_goto_heredoc(showline, eof, sep)
-  let s:showline = a:showline
-  let s:line = getline(s:showline)
+  let showline = a:showline
+  let line = getline(showline)
   while 1
-    let s:mcurline = getline(s:showline)
-    if match(s:mcurline, a:sep) == 0
+    let mcurline = getline(showline)
+    if match(mcurline, a:sep) == 0
       return a:showline
     endif
-    if a:eof != '' && trim(s:line) == trim(a:eof)
+    if a:eof != '' && trim(line) == trim(a:eof)
       break
     endif
-    let s:line = getline(s:showline)
-    let s:showline = s:showline + 1
+    let line = getline(showline)
+    let showline = showline + 1
   endwhile
-  return s:showline
+  return showline
 endfunction
 
 function! slide#goto(sep='"""', up=0)
@@ -64,72 +64,72 @@ function! slide#goto(sep='"""', up=0)
     return -1
   endif
   if a:up
-    let s:curline=search(a:sep, 'b')
-    let s:curline=search(a:sep, 'b')
+    let curline=search(a:sep, 'b')
+    let curline=search(a:sep, 'b')
   else
-    let s:curline = search(a:sep)
+    let curline = search(a:sep)
   endif
-  let s:eof = slide#get_heredoc_text(s:curline)
-  let s:showline = s:curline + 1
-  if s:eof == ''
-    let s:showline = slide#_goto_heredoc(s:showline, s:eof, a:sep)
-  elseif s:eof[0] == '@'
-    let s:showline = slide#_goto_vim_heredoc(s:showline, s:eof[1:], a:sep)
+  let eof = slide#get_heredoc_text(curline)
+  let showline = curline + 1
+  if eof == ''
+    let showline = slide#_goto_heredoc(showline, eof, a:sep)
+  elseif eof[0] == '@'
+    let showline = slide#_goto_vim_heredoc(showline, eof[1:], a:sep)
   else
-    let s:showline = slide#_goto_heredoc(s:showline, s:eof, a:sep)
+    let showline = slide#_goto_heredoc(showline, eof, a:sep)
   endif
-  call cursor(s:showline, 0)
+  call cursor(showline, 0)
   exec "norm z\n"
-  return s:curline + 1
+  return curline + 1
 endfunction
 
 function slide#_is_wait_line(line)
-  let s:split_line = split(getline(a:line), ' ')
-  if len(s:split_line) < 2
+  let split_line = split(getline(a:line), ' ')
+  if len(split_line) < 2
     return 0
-  elseif trim(s:split_line[0]) == 'call' && trim(s:split_line[1])[:9] == 'slide#wait'
+  elseif trim(split_line[0]) == 'call' && trim(split_line[1])[:9] == 'slide#wait'
     return 1
   endif
   return 0
 endfunction
 
 function slide#_run_heredoc_based(curline, eof, sep)
-  let s:curline = a:curline
-  let s:command = ''
-  while s:curline < line('$') + 1
+  let curline = a:curline
+  let command = ''
+  while curline < line('$') + 1
     " Stop if wait mode
-    if slide#_is_wait_line(s:curline) == 1
-      let g:slide#current_line = s:curline + 1
-      exec $"{a:curline},{s:curline}source"
+    if slide#_is_wait_line(curline) == 1
+      let g:slide#current_line = curline + 1
+      exec $"{a:curline},{curline}source"
       return
-    elseif s:curline->getline()->trim() == a:eof->trim()
-      exec $"{a:curline},{s:curline-1}source"
+    elseif curline->getline()->trim() == a:eof->trim()
+      exec $"{a:curline},{curline-1}source"
       break
-    elseif s:curline->getline()->match(a:sep->trim()) > -1
-      exec $"{a:curline},{s:curline}source"
+    elseif curline->getline()->match(a:sep->trim()) > -1
+      exec $"{a:curline},{curline}source"
       return
     endif
-    let s:curline = s:curline + 1
+    let curline = curline + 1
   endwhile
-  exec $"{a:curline},{s:curline-1}source"
+  exec $"{a:curline},{curline-1}source"
 endfunction
 
 function slide#run(line=0, sep='^"""')
   if a:line == -1
     " When it is in waiting mode.
     let g:slide#is_waiting = 0
-    let s:line = g:slide#current_line
+    let line = g:slide#current_line
     let g:slide#eof = slide#get_heredoc_text(search(a:sep, 'bn'))
   else
-    let s:line = a:line == 0 ? search(a:sep, 'bn')+1 : a:line
-    let g:slide#eof = slide#get_heredoc_text(s:line-1)
+    let line = a:line == 0 ? search(a:sep, 'bn')+1 : a:line
+    let g:slide#eof = slide#get_heredoc_text(line-1)
   endif
   if g:slide#eof == ''
     return
   elseif g:slide_script_enable == 0
     return
   endif
-  call slide#_run_heredoc_based(s:line, g:slide#eof, a:sep)
+  call slide#_run_heredoc_based(line, g:slide#eof, a:sep)
 endfunction
 
 
@@ -173,8 +173,8 @@ function slide#set_key(key, direction=0, sep_num=3)
 endfunction
 
 function slide#next(num)
-  let s:arg = g:slide#keys[a:num]
-  call slide#run(slide#goto(s:arg['sep'], s:arg['direction']),s:arg['sep'])
+  let arg = g:slide#keys[a:num]
+  call slide#run(slide#goto(arg['sep'], arg['direction']),arg['sep'])
 endfunction
 
 function slide#wait()
@@ -193,8 +193,8 @@ function slide#hide_cursor()
 endfunction
 
 function slide#_get_pos_percent(direction, pos)
-  let s:whole_comm = a:direction == 'x' ? &columns : &lines
-  return a:pos * 100 / s:whole_comm
+  let whole_comm = a:direction == 'x' ? &columns : &lines
+  return a:pos * 100 / whole_comm
 endfunction
 
 function! slide#chip(fname, compose='over', geometry='+0+0')
@@ -202,61 +202,61 @@ function! slide#chip(fname, compose='over', geometry='+0+0')
 endfunction
 
 function! slide#canvas(images, output='tmp', type='file')
-  let s:code = $"magick {a:images[0]["fname"]} "
-  let s:suffix = ''
+  let code = $"magick {a:images[0]["fname"]} "
+  let suffix = ''
   if a:type == 'fifo'
     call system($'rm {a:output}')
     call system($'mkfifo {a:output}')
-    let s:suffix = '&'
+    let suffix = '&'
   endif
   for image in a:images[1:]
-    let s:code = s:code.$"  {image['fname']} -geometry {image['geometry']}
+    let code = code.$"  {image['fname']} -geometry {image['geometry']}
           \ -compose {image['compose']} -composite  "
   endfor
-  let s:result = #{fname: a:output, type: a:type}
-  let s:result["job"] = system(s:code." -format png - " . $" > {a:output} {s:suffix}")
-  return s:result
+  let result = #{fname: a:output, type: a:type}
+  let result["job"] = system(code." -format png - " . $" > {a:output} {suffix}")
+  return result
 endfunction
 
 function slide#image(fname, pos=[0, 0, 0, 0])
   if type(a:fname) == v:t_dict
-    let s:fname = $"< {a:fname["fname"]}"
-    let s:is_canvas = 1
+    let fname = $"< {a:fname["fname"]}"
+    let is_canvas = 1
   else
-    let s:arg = trim(a:fname)
-    let s:kitten_suffix = s:arg[len(s:arg)-1] != '|' ? a:fname : " </dev/tty"
-    let s:fname = s:arg[len(s:arg)-1] == '|' ? a:fname : $"< {a:fname}"
-    let s:is_canvas = 0
+    let arg = trim(a:fname)
+    let kitten_suffix = arg[len(arg)-1] != '|' ? a:fname : " </dev/tty"
+    let fname = arg[len(arg)-1] == '|' ? a:fname : $"< {a:fname}"
+    let is_canvas = 0
   endif
   let s:echoraw = has('nvim')
         \? {str -> chansend(v:stderr, str)}
         \: {str->echoraw(str)}
   call s:echoraw("\x1b[s")
   if g:slide#terminal == 'sixel'
-    let s:y = slide#_get_pos_percent('y', a:pos[1])
-    let s:x = slide#_get_pos_percent('x', a:pos[0])
-    let s:width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
-    let s:height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
-    call s:echoraw($"\x1b[{s:y};{s:x}H")
-    let s:width_comm = a:pos[2] != 0 ? $" -w {s:width}%" : ' -w auto'
-    let s:height_comm = a:pos[3] != 0 ? $" -h {s:height}%" : ' -h auto'
-    call s:echoraw(system($"{s:fname} img2sixel {s:width_comm}{s:height_comm}"))
+    let y = slide#_get_pos_percent('y', a:pos[1])
+    let x = slide#_get_pos_percent('x', a:pos[0])
+    let width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
+    let height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
+    call s:echoraw($"\x1b[{y};{x}H")
+    let width_comm = a:pos[2] != 0 ? $" -w {width}%" : ' -w auto'
+    let height_comm = a:pos[3] != 0 ? $" -h {height}%" : ' -h auto'
+    call s:echoraw(system($"{fname} img2sixel {width_comm}{height_comm}"))
     call s:echoraw("\x1b[u")
   elseif g:slide#terminal == 'wezterm-iterm'
-    let s:width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
-    let s:height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
-    let s:y = slide#_get_pos_percent('y', a:pos[1])
-    let s:x = slide#_get_pos_percent('x', a:pos[0])
-    let s:width = a:pos[2] != 0 ? $" --width {a:pos[2]}" : ''
-    let s:height = a:pos[3] != 0 ? $" --height {a:pos[3]}" : ''
-    call s:echoraw(system($"{s:fname} wezterm imgcat {s:width}{s:height} --position={s:x},{s:y}"))
+    let width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
+    let height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
+    let y = slide#_get_pos_percent('y', a:pos[1])
+    let x = slide#_get_pos_percent('x', a:pos[0])
+    let width = a:pos[2] != 0 ? $" --width {a:pos[2]}" : ''
+    let height = a:pos[3] != 0 ? $" --height {a:pos[3]}" : ''
+    call s:echoraw(system($"{fname} wezterm imgcat {width}{height} --position={x},{y}"))
   elseif g:slide#terminal == 'kitty'
     if a:pos[2] != 0 && a:pos[2] != 0
-      let s:attr = $"--place {a:pos[2]}x{a:pos[3]}@{a:pos[0]}x{a:pos[1]}"
+      let attr = $"--place {a:pos[2]}x{a:pos[3]}@{a:pos[0]}x{a:pos[1]}"
     else
-      let s:attr = ""
+      let attr = ""
     endif
-    call system($'{s:fname} kitten icat {s:attr} >/dev/tty ')
+    call system($'{fname} kitten icat {attr} >/dev/tty ')
   endif
   if a:fname["type"] == 'fifo'
     call system($'rm {a:fname["fname"]}')
