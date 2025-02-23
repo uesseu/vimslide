@@ -93,7 +93,7 @@ slide#start(3, '<down>', '<up>')
 - 項目3
 
 """EOF
-call slide#image('img.png', 0, 0, 3, 3)
+call slide#image('img.png', [0, 0, 3, 3])
 EOF
 題名2
 
@@ -172,7 +172,7 @@ let g:slide#terminal = 'kitty'
 あとは、下記です。
 
 ```
-call slide#image([ファイル名], [x軸], [y軸], [幅], [高さ])
+call slide#image([ファイル名], [x軸, y軸, 幅, 高さ])
 ```
 
 スライドを遷移する場合は画像を消える事がほとんどですが、消えない時や動的スライドの途中で消す必要がある場合は下記の通りです。

@@ -80,12 +80,12 @@ The name cannot involve white spaces.
 Example:
   >
   """ First
-  call slide#image('img1.png', 0, 0, 3, 3)
+  call slide#image('img1.png', [0, 0, 3, 3])
   First
   Contents1
 
   """ Second
-  call slide#image('img2.png', 0, 0, 3, 3)
+  call slide#image('img2.png', [0, 0, 3, 3])
   Second
   Contents2
 
@@ -102,13 +102,13 @@ of same name. The variable should be used with here document.
 Example:
   >
   """ @First
-  call slide#image('img1.png', 0, 0, 3, 3)
+  call slide#image('img1.png', [0, 0, 3, 3])
   let First =<< BODY
   Contents1
   BODY
 
   """ @Second
-  call slide#image('img2.png', 0, 0, 3, 3)
+  call slide#image('img2.png', [0, 0, 3, 3])
   let Second =<< BODY
   Contents2
   BODY
