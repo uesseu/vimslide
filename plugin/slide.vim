@@ -119,17 +119,17 @@ function slide#run(line=0, sep='^"""')
     " When it is in waiting mode.
     let g:slide#is_waiting = 0
     let line = g:slide#current_line
-    let g:slide#eof = slide#get_heredoc_text(search(a:sep, 'bn'))
+    let slide#eof = slide#get_heredoc_text(search(a:sep, 'bn'))
   else
     let line = a:line == 0 ? search(a:sep, 'bn')+1 : a:line
-    let g:slide#eof = slide#get_heredoc_text(line-1)
+    let slide#eof = slide#get_heredoc_text(line-1)
   endif
-  if g:slide#eof == ''
+  if slide#eof == ''
     return
   elseif g:slide_script_enable == 0
     return
   endif
-  call slide#_run_heredoc_based(line, g:slide#eof, a:sep)
+  call slide#_run_heredoc_based(line, slide#eof, a:sep)
 endfunction
 
 
