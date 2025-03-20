@@ -14,6 +14,11 @@ let g:loaded_vimslide = 1
 let g:slide_script_enable = 1
 let g:slide#is_waiting = 0
 let g:slide#current_line = 1
+let g:slide#_expanded = ''
+let s:_appended_firstline = 0
+if !exists('g:slide#minimum_lines')
+  let g:slide#minimum_lines = 20
+endif
 " iterm, sixel, kitty, wezterm-iterm
 if !exists('g:slide#terminal')
   let g:slide#terminal = 'sixel'
@@ -24,16 +29,54 @@ function! slide#get_heredoc_text(line)
   return len(sep) == 0 ? '' : trim(sep[-1])
 endfunction
 
+function! slide#_expand_heredoc(current_line, append_num, toggle=1)
+  let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
+  let n = 0
+  while 1
+    if getline(a:current_line + n)->trim() == eof
+      break
+    endif
+    let n = n + 1
+  endwhile
+  if a:toggle == 1
+    for j in range(a:append_num)
+      call append(n+a:current_line-1, '')
+    endfor
+  else
+    call deletebufline(bufname(), n+a:current_line-a:append_num, n+a:current_line-1)
+  endif
+endfunction
 
-function! slide#_goto_vim_heredoc(showline, eof, sep)
+function! slide#_expand_sep(current_line, append_num, toggle=1, sep='"""')
+  let n = 0
+  while 1
+    if match(getline(a:current_line + n)->trim(), a:sep) > -1
+      break
+    endif
+    let n = n + 1
+  endwhile
+  if a:toggle == 1
+    for j in range(a:append_num)
+      call append(n+a:current_line-1, '')
+    endfor
+  else
+    call deletebufline(bufname(),
+          \n+a:current_line-a:append_num,
+          \n+a:current_line-1)
+  endif
+endfunction
+
+function! slide#_goto_vim_heredoc(showline, label, sep)
   let showline = a:showline
   while 1
-    let mcurline = trim(getline(showline))
+    let mcurline = showline->getline()->trim()
     if match(mcurline, a:sep) == 0
       return a:showline
     endif
-    let split_line = split(mcurline, ' ')
-    if len(split_line) > 1 && trim(split_line[0]) == 'let' && split(split_line[1], '=')[0] == trim(a:eof)
+    let split_line = mcurline->split(' ')
+    if len(split_line) > 1
+          \&& trim(split_line[0]) == 'let'
+          \&& split(split_line[1], '=')[0] == trim(a:label)
       break
     endif
     let showline = showline + 1
@@ -41,7 +84,7 @@ function! slide#_goto_vim_heredoc(showline, eof, sep)
   return showline + 1
 endfunction
 
-function! slide#_goto_heredoc(showline, eof, sep)
+function! slide#_goto_heredoc(showline, label, sep)
   let showline = a:showline
   let line = getline(showline)
   while 1
@@ -49,7 +92,7 @@ function! slide#_goto_heredoc(showline, eof, sep)
     if match(mcurline, a:sep) == 0
       return a:showline
     endif
-    if a:eof != '' && trim(line) == trim(a:eof)
+    if a:label != '' && trim(line) == trim(a:label)
       break
     endif
     let line = getline(showline)
@@ -63,20 +106,29 @@ function! slide#goto(sep='"""', up=0)
   if g:slide#is_waiting
     return -1
   endif
+  if g:slide#_expanded == 'heredoc'
+    echomsg getline(s:_expanded_line)
+    call slide#_expand_heredoc(s:_expanded_line, g:slide#minimum_lines, 0)
+    let g:slide#_expanded = ''
+  endif
   if a:up
     let curline=search(a:sep, 'b')
     let curline=search(a:sep, 'b')
   else
     let curline = search(a:sep)
   endif
-  let eof = slide#get_heredoc_text(curline)
+  let label = slide#get_heredoc_text(curline)
   let showline = curline + 1
-  if eof == ''
-    let showline = slide#_goto_heredoc(showline, eof, a:sep)
-  elseif eof[0] == '@'
-    let showline = slide#_goto_vim_heredoc(showline, eof[1:], a:sep)
+  if label == ''
+    let showline = slide#_goto_heredoc(showline, label, a:sep)
+    call slide#_expand_heredoc(showline-1, g:slide#minimum_lines)
+  elseif label[0] == '@'
+    let showline = slide#_goto_vim_heredoc(showline, label[1:], a:sep)
+    call slide#_expand_heredoc(showline-1, g:slide#minimum_lines)
+    let g:slide#_expanded = 'heredoc'
+    let s:_expanded_line = showline-1
   else
-    let showline = slide#_goto_heredoc(showline, eof, a:sep)
+    let showline = slide#_goto_heredoc(showline, label, a:sep)
   endif
   call cursor(showline, 0)
   exec "norm z\n"
@@ -93,7 +145,7 @@ function slide#_is_wait_line(line)
   return 0
 endfunction
 
-function slide#_run_heredoc_based(curline, eof, sep)
+function slide#_run_heredoc_based(curline, label, sep)
   let curline = a:curline
   let command = ''
   while curline < line('$') + 1
@@ -102,7 +154,7 @@ function slide#_run_heredoc_based(curline, eof, sep)
       let g:slide#current_line = curline + 1
       exec $"{a:curline},{curline}source"
       return
-    elseif curline->getline()->trim() == a:eof->trim()
+    elseif curline->getline()->trim() == a:label->trim()
       exec $"{a:curline},{curline-1}source"
       break
     elseif curline->getline()->match(a:sep->trim()) > -1
@@ -137,6 +189,11 @@ let g:slide#keys = []
 let g:slide#command_num = 0
 
 function slide#start(sep_num=3, forward='<down>', backward='<up>')
+  call cursor(0, 0)
+  if getline('.') != ''
+    call append(0, '')
+    let s:_appended_firstline = 1
+  endif
   set nocompatible
   set noruler
   set nonumber
@@ -160,6 +217,17 @@ function slide#start(sep_num=3, forward='<down>', backward='<up>')
   endif
   call slide#set_key(a:forward, 0, a:sep_num)
   call slide#set_key(a:backward, 1, a:sep_num)
+endfunction
+
+
+function slide#end()
+  if g:slide#_expanded == 'heredoc'
+    call slide#_expand_heredoc(s:_expanded_line, g:slide#minimum_lines, 0)
+    let g:slide#_expanded = ''
+  endif
+  if s:_expanded_line == 1
+    call deletebufline(bufname(), 1)
+  endif
 endfunction
 
 
