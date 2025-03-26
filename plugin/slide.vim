@@ -29,28 +29,16 @@ function! slide#get_heredoc_text(line)
   return len(sep) == 0 ? '' : trim(sep[-1])
 endfunction
 
-function! slide#_expand_heredoc(current_line, append_num, toggle=1)
-  let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
+function! slide#_expand_heredoc(current_line, append_num, toggle=1, atmark=1)
+  "let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
+  if a:atmark
+    let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
+  else
+    let eof = a:current_line->getline()->trim()->split('"')[1]->trim()
+  endif
   let n = 0
   while 1
     if getline(a:current_line + n)->trim() == eof
-      break
-    endif
-    let n = n + 1
-  endwhile
-  if a:toggle == 1
-    for j in range(a:append_num)
-      call append(n+a:current_line-1, '')
-    endfor
-  else
-    call deletebufline(bufname(), n+a:current_line-a:append_num, n+a:current_line-1)
-  endif
-endfunction
-
-function! slide#_expand_sep(current_line, append_num, toggle=1, sep='"""')
-  let n = 0
-  while 1
-    if match(getline(a:current_line + n)->trim(), a:sep) > -1
       break
     endif
     let n = n + 1
@@ -66,7 +54,62 @@ function! slide#_expand_sep(current_line, append_num, toggle=1, sep='"""')
   endif
 endfunction
 
-function! slide#_goto_vim_heredoc(showline, label, sep)
+function! slide#_expand_sep(current_line, append_num, toggle=1)
+  let n = 0
+  while 1
+    let br = 0
+    for a in g:slide#keys
+      if getline(a:current_line + n)->match(a['sep']) == 0
+        let br = 1
+        break
+      endif
+    endfor
+    if br == 1
+      break
+    endif
+    let n = n + 1
+  endwhile
+  if a:toggle == 1
+    for j in range(a:append_num)
+      call append(n+a:current_line-1, '')
+    endfor
+  else
+    call deletebufline(bufname(),
+          \n+a:current_line-a:append_num,
+          \n+a:current_line-1)
+  endif
+endfunction
+
+function! slide#_expand_sep(current_line, append_num, toggle=1)
+  let n = 0
+  while 1
+    let br = 0
+    for a in g:slide#keys
+      if getline(a:current_line + n)->match(a['sep']) == 0
+        let br = 1
+        break
+      endif
+    endfor
+    if br == 1
+      break
+    endif
+    let n = n + 1
+  endwhile
+  if a:toggle == 1
+    for j in range(a:append_num)
+      call append(n+a:current_line-1, '')
+    endfor
+  else
+    call deletebufline(bufname(),
+          \n+a:current_line-a:append_num,
+          \n+a:current_line-1)
+  endif
+endfunction
+
+function! slide#_expand(current_line, append_num, toggle=1)
+endfunction
+
+function! slide#_goto_atmark_heredoc(showline, label, sep)
   let showline = a:showline
   while 1
     let mcurline = showline->getline()->trim()
@@ -101,14 +144,46 @@ function! slide#_goto_heredoc(showline, label, sep)
   return showline
 endfunction
 
+function! slide#expand(toggle=1)
+  if a:toggle
+    let label = slide#get_heredoc_text(curline)
+    let showline = curline + 1
+    if label == ''
+      let showline = slide#_goto_heredoc(showline, label, a:sep)
+      call slide#_expand_sep(showline, g:slide#minimum_lines)
+      let g:slide#_expanded = 'sep'
+      let s:_expanded_line = showline-1
+    elseif label[0] == '@'
+      let showline = slide#_goto_atmark_heredoc(showline, label[1:], a:sep)
+      call slide#_expand_heredoc(showline-1, g:slide#minimum_lines)
+      let g:slide#_expanded = 'heredoc'
+      let s:_expanded_line = showline-1
+    else
+      let showline = slide#_goto_heredoc(showline, label, a:sep)
+    endif
+  else
+    if g:slide#_expanded == 'heredoc'
+      call slide#_expand_heredoc(s:_expanded_line,
+            \g:slide#minimum_lines, a:toggle)
+      let g:slide#_expanded = ''
+    elseif g:slide#_expanded == 'sep'
+      call slide#_expand_sep(s:_expanded_line,
+            \g:slide#minimum_lines, a:toggle)
+      let g:slide#_expanded = ''
+    endif
+  endif
+endfunction
+
 function! slide#goto(sep='"""', up=0)
   " Return -1 if stop mode. Else, return line to run.
   if g:slide#is_waiting
     return -1
   endif
   if g:slide#_expanded == 'heredoc'
-    echomsg getline(s:_expanded_line)
     call slide#_expand_heredoc(s:_expanded_line, g:slide#minimum_lines, 0)
+    let g:slide#_expanded = ''
+  elseif g:slide#_expanded == 'sep'
+    call slide#_expand_sep(s:_expanded_line, g:slide#minimum_lines, 0)
     let g:slide#_expanded = ''
   endif
   if a:up
@@ -121,9 +196,11 @@ function! slide#goto(sep='"""', up=0)
   let showline = curline + 1
   if label == ''
     let showline = slide#_goto_heredoc(showline, label, a:sep)
-    call slide#_expand_heredoc(showline-1, g:slide#minimum_lines)
+    call slide#_expand_sep(showline, g:slide#minimum_lines)
+    let g:slide#_expanded = 'sep'
+    let s:_expanded_line = showline-1
   elseif label[0] == '@'
-    let showline = slide#_goto_vim_heredoc(showline, label[1:], a:sep)
+    let showline = slide#_goto_atmark_heredoc(showline, label[1:], a:sep)
     call slide#_expand_heredoc(showline-1, g:slide#minimum_lines)
     let g:slide#_expanded = 'heredoc'
     let s:_expanded_line = showline-1
@@ -189,11 +266,7 @@ let g:slide#keys = []
 let g:slide#command_num = 0
 
 function slide#start(sep_num=3, forward='<down>', backward='<up>')
-  call cursor(0, 0)
-  if getline('.') != ''
-    call append(0, '')
-    let s:_appended_firstline = 1
-  endif
+  call cursor(1, 0)
   set nocompatible
   set noruler
   set nonumber
@@ -217,6 +290,12 @@ function slide#start(sep_num=3, forward='<down>', backward='<up>')
   endif
   call slide#set_key(a:forward, 0, a:sep_num)
   call slide#set_key(a:backward, 1, a:sep_num)
+  if getline('.') != ''
+    call append(0, '')
+    let s:_appended_firstline = 1
+    call cursor(1, 0)
+    call slide#next(0)
+  endif
 endfunction
 
 
@@ -224,9 +303,13 @@ function slide#end()
   if g:slide#_expanded == 'heredoc'
     call slide#_expand_heredoc(s:_expanded_line, g:slide#minimum_lines, 0)
     let g:slide#_expanded = ''
+  elseif g:slide#_expanded == 'sep'
+    call slide#_expand_sep(s:_expanded_line, g:slide#minimum_lines, 0)
+    let g:slide#_expanded = ''
   endif
-  if s:_expanded_line == 1
+  if s:_appended_firstline == 1
     call deletebufline(bufname(), 1)
+    let s:_appended_firstline = 0
   endif
 endfunction
 
@@ -347,6 +430,7 @@ function! slide#_wrapper(x, y)
 endfunction
 
 command -nargs=? SlideStart call slide#start(<args>)
+command -nargs=? SlideEnd call slide#end(<args>)
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
