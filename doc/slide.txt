@@ -4,7 +4,7 @@ Author: Shoichiro Nakanishi <sheepwing@kyudai.jp>
 License: MIT license
 
 ==============================================================================
-CONTENTS                                                        *slide-contents*
+CONTENTS
 
 Introduction		|slide-introduction|
 Configuration  	 	|slide-configuration|
