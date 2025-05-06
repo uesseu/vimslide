@@ -10,7 +10,6 @@ set cpo&vim
 if exists('g:loaded_vimslide')
   finish
 endif
-let g:slide#expand = 0
 let g:loaded_vimslide = 1
 let g:slide_script_enable = 1
 let g:slide#is_waiting = 0

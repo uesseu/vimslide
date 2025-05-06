@@ -17,7 +17,7 @@ function! slide#_expand_heredoc(current_line, append_num, toggle=1, atmark=1)
     endif
     let n = n + 1
   endwhile
-  if g:slide#expand == 0
+  if g:slide#minimum_lines == 0
     return
   endif
   if a:toggle == 1
@@ -75,7 +75,7 @@ function! slide#_expand_sep(current_line, append_num, toggle=1)
       break
     endif
   endwhile
-  if g:slide#expand == 0
+  if g:slide#minimum_lines == 0
     return
   endif
   if a:toggle == 1
