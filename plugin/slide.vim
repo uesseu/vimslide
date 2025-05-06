@@ -43,6 +43,9 @@ function! slide#_expand_heredoc(current_line, append_num, toggle=1, atmark=1)
     endif
     let n = n + 1
   endwhile
+  if g:slide#expand == 0
+    return
+  endif
   if a:toggle == 1
     for j in range(a:append_num)
       call append(n+a:current_line-1, '')
@@ -94,7 +97,13 @@ function! slide#_expand_sep(current_line, append_num, toggle=1)
       break
     endif
     let n = n + 1
+    if n+a:current_line-1 > line('$')
+      break
+    endif
   endwhile
+  if g:slide#expand == 0
+    return
+  endif
   if a:toggle == 1
     for j in range(a:append_num)
       call append(n+a:current_line-1, '')
@@ -138,6 +147,9 @@ function! slide#_goto_heredoc(showline, label, sep)
     if a:label != '' && trim(line) == trim(a:label)
       break
     endif
+    if showline >= line('$')
+      break
+    endif
     let line = getline(showline)
     let showline = showline + 1
   endwhile
@@ -174,6 +186,7 @@ function! slide#expand(toggle=1)
   endif
 endfunction
 
+let g:slide#expand = 0
 function! slide#goto(sep='"""', up=0)
   " Return -1 if stop mode. Else, return line to run.
   if g:slide#is_waiting
