@@ -16,6 +16,7 @@ Function		|slide-functions|
 INTRODUCTION                                                *slide-introduction*
 
 Let's use vim as a presentation software ;)
+It can only work on unix like system.
 
 ==============================================================================
 CONFIGURATION                                          	  *slide-configuration*
@@ -37,6 +38,10 @@ g:slide#terminal
     'wezterm-iterm':
         Use iterm2 protocol in wezterm. However wezterm supports sixel and
 	kitty and iterm protocol. It may perform better than sixel in wezterm.
+
+							    *g:slide#minimum_lines*
+g:slide#minimum_lines = 20
+    Minimum number of lines of one slide.
 
 							    *g:slide#is_waiting*
 g:slide#is_waiting = 0
