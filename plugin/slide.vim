@@ -11,13 +11,18 @@ if exists('g:loaded_vimslide')
   finish
 endif
 let g:loaded_vimslide = 1
+let g:slide#wrap = v:false
 let g:slide_script_enable = 1
 let g:slide#is_waiting = 0
+let g:slide#auto_redraw = v:true
 let g:slide#current_line = 1
 let g:slide#_expanded = ''
-let s:_appended_firstline = 0
+let g:_appended_firstline = 0
 if !exists('g:slide#minimum_lines')
   let g:slide#minimum_lines = 20
+endif
+if !exists('g:slide#tty')
+  let g:slide#tty = ""
 endif
 " iterm, sixel, kitty, wezterm-iterm
 if !exists('g:slide#terminal')

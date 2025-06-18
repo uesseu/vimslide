@@ -4,7 +4,6 @@ function! slide#get_heredoc_text(line)
 endfunction
 
 function! slide#_expand_heredoc(current_line, append_num, toggle=1, atmark=1)
-  "let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
   if a:atmark
     let eof = a:current_line->getline()->trim()->split('=<<')[1]->trim()
   else
@@ -199,10 +198,10 @@ function! slide#goto(sep='"""', up=0)
 endfunction
 
 function slide#_is_wait_line(line)
-  let split_line = split(getline(a:line), ' ')
+  let split_line = getline(a:line)->split(' ')
   if len(split_line) < 2
     return 0
-  elseif trim(split_line[0]) == 'call' && trim(split_line[1])[:9] == 'slide#wait'
+  elseif split_line[0]->trim() == 'call' && split_line[1]->trim()[:9] == 'slide#wait'
     return 1
   endif
   return 0
@@ -234,9 +233,9 @@ function slide#run(line=0, sep='^"""')
     " When it is in waiting mode.
     let g:slide#is_waiting = 0
     let line = g:slide#current_line
-    let label = slide#get_heredoc_text(search(a:sep, 'bn'))
+    let label = a:sep->search('bn')->slide#get_heredoc_text()
   else
-    let line = a:line == 0 ? search(a:sep, 'bn')+1 : a:line
+    let line = a:line == 0 ? a:sep->search('bn')+1 : a:line
     let label = slide#get_heredoc_text(line-1)
   endif
   if label == ''
@@ -260,6 +259,8 @@ function slide#start(sep_num=3, forward='<down>', backward='<up>')
   set nolist
   set noshowcmd
   set nocursorline
+  set showtabline=0
+  set signcolumn=no
   if has('nvim')
     highlight Normal guibg=none
     highlight NonText guibg=none
@@ -278,10 +279,15 @@ function slide#start(sep_num=3, forward='<down>', backward='<up>')
   call slide#set_key(a:backward, 1, a:sep_num)
   if getline('.') != ''
     call append(0, '')
-    let s:_appended_firstline = 1
+    let g:_appended_firstline = 1
     call cursor(1, 0)
     call slide#next(0)
   endif
+  call slide#hide_cursor()
+  if $TMUX != ''
+    call system('tmux set status off')
+  endif
+  au VimLeave * call slide#end()
 endfunction
 
 
@@ -293,10 +299,14 @@ function slide#end()
     call slide#_expand_sep(s:_expanded_line, g:slide#minimum_lines, 0)
     let g:slide#_expanded = ''
   endif
-  if s:_appended_firstline == 1
+  if g:_appended_firstline == 1
     call deletebufline(bufname(), 1)
-    let s:_appended_firstline = 0
+    let g:_appended_firstline = 0
   endif
+  if $TMUX != ''
+    call system('tmux set status on')
+  endif
+  call slide#show_cursor()
 endfunction
 
 
@@ -310,8 +320,12 @@ function slide#set_key(key, direction=0, sep_num=3)
 endfunction
 
 function slide#next(num)
+  if g:slide#auto_redraw
+    redraw!
+    mode
+  endif
   let arg = g:slide#keys[a:num]
-  call slide#run(slide#goto(arg['sep'], arg['direction']),arg['sep'])
+  call slide#goto(arg['sep'], arg['direction'])->slide#run(arg['sep'])
 endfunction
 
 function slide#wait()
@@ -322,11 +336,22 @@ function slide#put_text(line, text)
   call setline(line('.') + a:line, a:text)
 endfunction
 
+function s:hide_cursor_nvim(str)
+  execute $"lua vim.api.nvim_out_write('{a:str}'..'\\n')"
+endfunction
+
 function slide#hide_cursor()
+  let s:echoraw = has('nvim')
+        \? {str->s:hide_cursor_nvim(str)}
+        \: {str->echoraw(str)}
+  call s:echoraw("\e[?25l")
+endfunction
+
+function slide#show_cursor()
   let s:echoraw = has('nvim')
         \? {str -> chansend(v:stderr, str)}
         \: {str->echoraw(str)}
-  call s:echoraw("\x1b[6 q")
+  call s:echoraw("\x1b[?25h")
 endfunction
 
 function slide#_get_pos_percent(direction, pos)
@@ -338,7 +363,7 @@ function! slide#chip(fname, compose='over', geometry='+0+0')
   return #{fname: a:fname, compose: a:compose, geometry: a:geometry}
 endfunction
 
-function! slide#canvas(images, output='tmp', type='file')
+function! slide#canvas(images, output='tmp.png', type='file')
   let code = $"magick {a:images[0]["fname"]} "
   let suffix = ''
   if a:type == 'fifo'
@@ -351,49 +376,58 @@ function! slide#canvas(images, output='tmp', type='file')
           \ -compose {image['compose']} -composite  "
   endfor
   let result = #{fname: a:output, type: a:type}
+  echo code." -format png - " . $" > {a:output} {suffix}"
   let result["job"] = system(code." -format png - " . $" > {a:output} {suffix}")
   return result
 endfunction
 
 function slide#image(fname, pos=[0, 0, 0, 0])
+  if g:slide#tty == ""
+    let pid = system('ps -o ppid= -p '.getpid())
+    let tty = '/dev/'.system('ps -o tty= -p '.pid)
+    let tty = tty->trim() == '/dev/?' ? "/dev/tty" : tty
+  else
+    tty = g:slide#tty
+  endif
+
   if type(a:fname) == v:t_dict
     let fname = $"< {a:fname["fname"]}"
     let is_canvas = 1
   else
     let arg = trim(a:fname)
-    let kitten_suffix = arg[len(arg)-1] != '|' ? a:fname : " </dev/tty"
+    let kitten_suffix = arg[len(arg)-1] != '|' ? a:fname : " <".tty
     let fname = arg[len(arg)-1] == '|' ? a:fname : $"< {a:fname}"
     let is_canvas = 0
   endif
   let s:echoraw = has('nvim')
         \? {str -> chansend(v:stderr, str)}
-        \: {str->echoraw(str)}
+        \: {str -> echoraw(str)}
   call s:echoraw("\x1b[s")
   if g:slide#terminal == 'sixel'
-    let y = slide#_get_pos_percent('y', a:pos[1])
-    let x = slide#_get_pos_percent('x', a:pos[0])
-    let width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
-    let height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
+    let y = a:pos[1]
+    let x = a:pos[0]
+    let width = a:pos[2] != 0 ? a:pos[2]: 0
+    let height = a:pos[3] != 0 ? a:pos[3]: 0
     call s:echoraw($"\x1b[{y};{x}H")
     let width_comm = a:pos[2] != 0 ? $" -w {width}%" : ' -w auto'
     let height_comm = a:pos[3] != 0 ? $" -h {height}%" : ' -h auto'
     call s:echoraw(system($"{fname} img2sixel {width_comm}{height_comm}"))
     call s:echoraw("\x1b[u")
   elseif g:slide#terminal == 'wezterm-iterm'
-    let width = a:pos[2] != 0 ? slide#_get_pos_percent('x', a:pos[2]): 0
-    let height = a:pos[3] != 0 ? slide#_get_pos_percent('y', a:pos[3]): 0
-    let y = slide#_get_pos_percent('y', a:pos[1])
-    let x = slide#_get_pos_percent('x', a:pos[0])
+    let width = a:pos[2] != 0 ? a:pos[2]: 0
+    let height = a:pos[3] != 0 ? a:pos[3]: 0
+    let y = a:pos[1]
+    let x = a:pos[0]
     let width = a:pos[2] != 0 ? $" --width {a:pos[2]}" : ''
     let height = a:pos[3] != 0 ? $" --height {a:pos[3]}" : ''
-    call s:echoraw(system($"{fname} wezterm imgcat {width}{height} --position={x},{y}"))
+    call system($"{fname} wezterm imgcat {width}{height} --position={x},{y} > {tty}\n")
   elseif g:slide#terminal == 'kitty'
     if a:pos[2] != 0 && a:pos[2] != 0
       let attr = $"--place {a:pos[2]}x{a:pos[3]}@{a:pos[0]}x{a:pos[1]}"
     else
       let attr = ""
     endif
-    call system($'{fname} kitten icat {attr} >/dev/tty ')
+    call system($"{fname} kitten icat {attr} > {tty}\n < {tty}\n")
   endif
   if a:fname["type"] == 'fifo'
     call system($'rm {a:fname["fname"]}')
@@ -409,7 +443,6 @@ func! slide#callback_echo(channel)
     echomsg ch_read(a:channel)
   endwhile
 endfunc
-
 
 function! slide#_wrapper(x, y)
   exec a:x
