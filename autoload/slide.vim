@@ -183,6 +183,7 @@ function slide#_is_wait_line(line)
 endfunction
 
 function slide#_run_heredoc_based(curline, label, sep)
+  redraw!
   let curline = a:curline
   let command = ''
   while curline < line('$') + 1
