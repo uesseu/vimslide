@@ -30,34 +30,9 @@ function! slide#_expand_heredoc(current_line, append_num, toggle=1, atmark=1)
   endif
 endfunction
 
-function! slide#_expand_sep(current_line, append_num, toggle=1)
-  let n = 0
-  while 1
-    let br = 0
-    for a in g:slide#keys
-      if getline(a:current_line + n)->match(a['sep']) == 0
-        let br = 1
-        break
-      endif
-    endfor
-    if br == 1
-      break
-    endif
-    let n = n + 1
-  endwhile
-  if a:toggle == 1
-    for j in range(a:append_num)
-      call append(n+a:current_line-1, '')
-    endfor
-  else
-    call deletebufline(bufname(),
-          \n+a:current_line-a:append_num,
-          \n+a:current_line-1)
-  endif
-endfunction
 
 function! slide#_expand_sep(current_line, append_num, toggle=1)
-  let n = 0
+  let n = a:toggle ? 0 : 1
   while 1
     let br = 0
     for a in g:slide#keys
